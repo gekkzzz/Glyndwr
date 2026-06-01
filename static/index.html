@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Glyndwr — AI Workspace</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⊕</text></svg>" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/static/css/main.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+</head>
+<body class="theme-dragon">
+
+<!-- Animated background canvas -->
+<canvas id="bg-canvas"></canvas>
+
+<!-- Loading Screen -->
+<div class="spinner-overlay" id="app-spinner">
+  <div style="text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
+    <pre style="color:var(--red); line-height:1.25; font-size:13px; font-family:inherit; margin:0; user-select:none">    /\        /\
+   /  \  /\  /  \
+  / /\ \/  \/ /\ \
+ /_/  \_\  /_/  \_\</pre>
+    <div style="color:var(--fg); font-size:15px; font-weight:700; letter-spacing:0.35em; margin-top:4px;">GLYNDWR</div>
+    <div class="spinner"></div>
+    <div style="color:var(--text-muted); font-size:12px; letter-spacing:0.12em;">loading workspace...</div>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- ── Nav Rail ──────────────────────────────────────────── -->
+  <nav id="nav-rail">
+    <div id="nav-logo">⊕</div>
+    <div id="nav-items">
+
+      <!-- Workspace -->
+      <div class="nav-group-label">Work</div>
+      <button class="nav-item active" data-section="chat" title="Chat">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="nav-label">Chat</span>
+      </button>
+      <button class="nav-item" data-section="notes" title="Notes">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+        <span class="nav-label">Notes</span>
+      </button>
+      <button class="nav-item" data-section="tasks" title="Tasks">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="nav-label">Tasks</span>
+      </button>
+      <button class="nav-item" data-section="documents" title="Library">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="nav-label">Library</span>
+      </button>
+      <button class="nav-item" data-section="gallery" title="Gallery">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+        <span class="nav-label">Gallery</span>
+      </button>
+      <button class="nav-item" data-section="email" title="Email">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span class="nav-label">Email</span>
+      </button>
+      <button class="nav-item" data-section="calendar" title="Calendar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="nav-label">Calendar</span>
+      </button>
+
+      <!-- Tools -->
+      <div class="nav-group-label">Tools</div>
+      <div id="nav-tools-wrapper" style="position:relative;width:100%">
+        <button class="nav-item" id="nav-tools-btn" title="Tools">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          <span class="nav-label">Tools</span>
+        </button>
+        <div id="nav-tools-flyout" class="nav-flyout hidden">
+          <div class="nav-flyout-header">Tools</div>
+          <button class="nav-flyout-item" data-section="agent">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="3"/><path d="M12 8v3"/></svg>
+            <div><div class="nav-flyout-title">Agent</div><div class="nav-flyout-desc">Autonomous tool-use loop</div></div>
+          </button>
+          <button class="nav-flyout-item" data-section="research">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <div><div class="nav-flyout-title">Deep Research</div><div class="nav-flyout-desc">Multi-step web synthesis</div></div>
+          </button>
+          <button class="nav-flyout-item" data-section="memory">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <div><div class="nav-flyout-title">Memory</div><div class="nav-flyout-desc">Persistent knowledge base</div></div>
+          </button>
+          <button class="nav-flyout-item" data-section="cookbook">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div><div class="nav-flyout-title">Forge</div><div class="nav-flyout-desc">Hardware &amp; model guide</div></div>
+          </button>
+          <div class="nav-flyout-sep"></div>
+          <button class="nav-flyout-item" id="flyout-compare-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+            <div><div class="nav-flyout-title">Compare</div><div class="nav-flyout-desc">Side-by-side model test</div></div>
+          </button>
+        </div>
+      </div>
+
+    </div>
+    <div id="nav-bottom">
+      <div class="nav-user-avatar" id="nav-user-avatar" title="Account">?</div>
+      <button class="nav-item" id="nav-settings-btn" title="Settings">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span class="nav-label">Settings</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ── CHAT SECTION ─────────────────────────────────────── -->
+  <section id="section-chat" class="section active">
+    <aside id="chat-sidebar">
+      <div id="chat-sidebar-header">
+        <button id="new-chat-btn" title="New chat (Ctrl+N)">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Chat
+        </button>
+      </div>
+      <div id="conversation-list"></div>
+      <div id="chat-sidebar-footer">
+        <button class="footer-btn" id="compare-btn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+          Compare
+        </button>
+      </div>
+    </aside>
+    <div id="chat-main">
+      <header id="chat-header">
+        <button id="hamburger-btn" title="Menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div id="chat-title-area">
+          <span id="current-title">New Chat</span>
+          <button id="rename-btn" title="Rename">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+        </div>
+        <div id="header-actions">
+          <select id="model-select" title="Select model"><option value="">Loading…</option></select>
+          <button class="header-btn danger" id="clear-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/></svg>
+            <span>Clear</span>
+          </button>
+        </div>
+      </header>
+      <div id="system-prompt-bar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="system-prompt-preview"></span>
+        <button id="edit-system-prompt-btn">Edit prompt</button>
+      </div>
+      <div id="messages-area">
+        <div id="welcome-screen">
+          <div class="welcome-logo">⊕</div>
+          <h1 class="welcome-title">Glyndwr</h1>
+          <p class="welcome-sub">Your self-hosted AI workspace.</p>
+          <div class="welcome-prompts" id="welcome-prompts">
+            <button class="welcome-prompt-btn" data-prompt="Explain quantum entanglement in simple terms">Explain quantum entanglement</button>
+            <button class="welcome-prompt-btn" data-prompt="Write a Python function to merge two sorted lists">Merge two sorted lists in Python</button>
+            <button class="welcome-prompt-btn" data-prompt="What are the key differences between REST and GraphQL?">REST vs GraphQL differences</button>
+            <button class="welcome-prompt-btn" data-prompt="Help me write a professional email declining a meeting">Decline a meeting professionally</button>
+          </div>
+          <div class="provider-status" id="provider-status"></div>
+          <p id="welcome-setup-hint" class="form-hint hidden" style="max-width:400px;text-align:center">No providers configured. Open <strong>Settings → Providers</strong> to add API keys.</p>
+        </div>
+        <div id="messages-list"></div>
+      </div>
+      <footer id="input-area">
+        <div id="input-container">
+          <textarea id="message-input" placeholder="Message Glyndwr… (Enter to send, Shift+Enter for newline)" rows="1" autocomplete="off" spellcheck="true"></textarea>
+          <button id="send-btn" title="Send (Enter)" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div id="input-meta">
+          <span id="token-count"></span>
+          <button id="attach-btn" title="Attach file"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+          <input type="file" id="file-input" hidden accept="image/*,.txt,.md,.py,.js,.ts,.json,.csv,.html,.css,.xml,.yaml,.yml" />
+          <span id="input-hint" class="hidden"><kbd>Enter</kbd> send &nbsp;<kbd>Shift+Enter</kbd> newline &nbsp;<kbd>Ctrl+N</kbd> new chat</span>
+        </div>
+      </footer>
+    </div>
+  </section>
+
+  <!-- ── AGENT SECTION ─────────────────────────────────────── -->
+  <section id="section-agent" class="section">
+    <div id="agent-container">
+      <div id="agent-header">
+        <h2 class="section-heading">Agent</h2>
+        <div id="agent-controls">
+          <select id="agent-model-select" title="Agent model"><option value="">Loading…</option></select>
+          <div id="agent-tools-toggle">
+            <label class="tool-toggle"><input type="checkbox" id="tool-search" checked><span>Search</span></label>
+            <label class="tool-toggle"><input type="checkbox" id="tool-fetch" checked><span>Fetch</span></label>
+            <label class="tool-toggle"><input type="checkbox" id="tool-exec" checked><span>Code</span></label>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="agent-clear-btn">Clear</button>
+        </div>
+      </div>
+      <div id="agent-messages"></div>
+      <div id="agent-input-row">
+        <textarea id="agent-input" placeholder="Give the agent a task… it will use search, code execution, and web browsing to complete it." rows="2"></textarea>
+        <button class="btn btn-primary" id="agent-send-btn">Run Agent</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── RESEARCH SECTION ──────────────────────────────────── -->
+  <section id="section-research" class="section">
+    <div id="research-container">
+      <div id="research-header">
+        <h2 class="section-heading">Deep Research</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="research-model-select" title="Research model"><option value="">Loading…</option></select>
+          <select id="research-depth" title="Research depth">
+            <option value="2">Quick (2 queries)</option>
+            <option value="3" selected>Standard (3 queries)</option>
+            <option value="5">Deep (5 queries)</option>
+          </select>
+        </div>
+      </div>
+      <div id="research-status-bar" style="display:none">
+        <div class="spinner" style="width:14px;height:14px"></div>
+        <span id="research-status-text">Starting research…</span>
+      </div>
+      <div id="research-sources" style="display:none">
+        <div class="section-title" style="margin-bottom:8px">Sources</div>
+        <div id="research-sources-list"></div>
+      </div>
+      <div id="research-report"></div>
+      <div id="research-input-row">
+        <input type="text" id="research-input" placeholder="What do you want to research? Be specific for best results." />
+        <button class="btn btn-primary" id="research-btn">Research</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── NOTES SECTION ─────────────────────────────────────── -->
+  <section id="section-notes" class="section">
+    <div id="notes-list-panel">
+      <div class="panel-header">
+        <span class="panel-title">Notes</span>
+        <button class="panel-action-btn" id="new-note-btn" title="New note"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      </div>
+      <div id="notes-list"></div>
+    </div>
+    <div id="notes-editor-panel">
+      <div id="notes-editor-header">
+        <input type="text" id="note-title-input" placeholder="Note title…" />
+      </div>
+      <textarea id="note-content-textarea" placeholder="Start writing… (Markdown supported)"></textarea>
+      <div id="notes-editor-footer">
+        <span id="note-save-status" class="text-muted"></span>
+        <button class="btn btn-danger btn-sm" id="delete-note-btn" style="display:none">Delete note</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TASKS SECTION ─────────────────────────────────────── -->
+  <section id="section-tasks" class="section">
+    <div id="tasks-container">
+      <div id="tasks-header">
+        <h2 class="section-heading">Tasks</h2>
+        <div id="task-add-row">
+          <input type="text" id="task-input" placeholder="Add a new task…" autocomplete="off" />
+          <input type="date" id="task-due-date" title="Due date (optional)" style="max-width:150px" />
+          <button class="btn btn-primary" id="add-task-btn">Add</button>
+        </div>
+        <div id="task-filter-tabs">
+          <button class="task-filter-tab active" data-filter="all">All</button>
+          <button class="task-filter-tab" data-filter="active">Active</button>
+          <button class="task-filter-tab" data-filter="done">Done</button>
+          <button class="task-filter-tab" data-filter="overdue">Overdue</button>
+        </div>
+      </div>
+      <div id="tasks-list"></div>
+    </div>
+  </section>
+
+  <!-- ── LIBRARY / DOCUMENTS SECTION ──────────────────────── -->
+  <section id="section-documents" class="section">
+    <div id="doc-list-panel">
+      <div class="panel-header">
+        <span class="panel-title">Library</span>
+        <button class="panel-action-btn" id="new-doc-btn" title="New document">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div id="doc-format-filter">
+        <button class="doc-filter-btn active" data-fmt="">All</button>
+        <button class="doc-filter-btn" data-fmt="markdown">MD</button>
+        <button class="doc-filter-btn" data-fmt="html">HTML</button>
+        <button class="doc-filter-btn" data-fmt="csv">CSV</button>
+        <button class="doc-filter-btn" data-fmt="plain">TXT</button>
+      </div>
+      <div id="doc-list"></div>
+    </div>
+    <div id="doc-editor-panel">
+      <div id="doc-empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--text-faint)"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <p style="color:var(--text-faint);font-size:13px;margin-top:12px">Select a document or create a new one</p>
+        <button class="btn btn-primary btn-sm" id="new-doc-empty-btn" style="margin-top:16px">New Document</button>
+      </div>
+      <div id="doc-workspace" style="display:none;flex-direction:column;height:100%">
+        <div id="doc-tabbar">
+          <div id="doc-tab-strip"></div>
+          <div id="doc-view-switcher">
+            <button class="doc-view-btn active" data-view="preview" title="Preview">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Preview
+            </button>
+            <button class="doc-view-btn" data-view="source" title="Source">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              Code
+            </button>
+            <button class="doc-view-btn" data-view="split" title="Split view">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+              Split
+            </button>
+          </div>
+          <div id="doc-toolbar">
+            <input type="text" id="doc-title-input" placeholder="Document title…" />
+            <select id="doc-format-select">
+              <option value="markdown">Markdown</option>
+              <option value="html">HTML</option>
+              <option value="csv">CSV</option>
+              <option value="plain">Plain Text</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="doc-ai-btn">AI ▾</button>
+            <div id="doc-ai-menu" class="dropdown-menu hidden">
+              <div class="dropdown-item" data-action="improve">✦ Improve writing</div>
+              <div class="dropdown-item" data-action="summarize">∑ Summarize</div>
+              <div class="dropdown-item" data-action="expand">↗ Expand</div>
+              <div class="dropdown-item" data-action="fix_grammar">✓ Fix grammar</div>
+              <div class="dropdown-item" data-action="explain">? Explain</div>
+              <div class="dropdown-item" data-action="translate">⇄ Translate</div>
+            </div>
+            <button class="btn btn-danger btn-sm" id="delete-doc-btn" style="display:none" title="Delete document">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="doc-statusbar">
+          <span id="doc-save-status" class="text-muted"></span>
+          <span id="doc-word-count" class="text-muted"></span>
+        </div>
+        <div id="doc-editor-body">
+          <div id="doc-source-pane">
+            <div id="doc-source-lines"></div>
+            <textarea id="doc-content-textarea" placeholder="Start writing…" spellcheck="true"></textarea>
+          </div>
+          <div id="doc-preview-panel"></div>
+        </div>
+        <div id="doc-ai-bar" style="display:none">
+          <div class="spinner" style="width:12px;height:12px;flex-shrink:0"></div>
+          <span id="doc-ai-status" style="font-size:12px;color:var(--text-muted)">AI working…</span>
+          <span id="doc-ai-output" style="font-size:12px;color:var(--fg);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── GALLERY / IMAGE EDITOR SECTION ───────────────────── -->
+  <section id="section-gallery" class="section">
+    <div id="gallery-list-panel">
+      <div class="panel-header">
+        <span class="panel-title">Gallery</span>
+        <button class="panel-action-btn" id="new-image-btn" title="New image">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+      <div id="gallery-list"></div>
+    </div>
+    <div id="image-editor-area">
+      <!-- Editor toolbar -->
+      <div id="editor-toolbar">
+        <div id="editor-tools">
+          <button class="editor-tool-btn active" id="tool-brush" title="Brush (B)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          </button>
+          <button class="editor-tool-btn" id="tool-eraser" title="Eraser (E)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20H7L3 16l11-11 8 8-2 7z"/><path d="M6.0001 11.0001L13 18"/></svg>
+          </button>
+          <button class="editor-tool-btn" id="tool-move" title="Move (V)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>
+          </button>
+          <button class="editor-tool-btn" id="tool-select-rect" title="Rectangle Select (M)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="4 2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+          </button>
+          <div class="editor-tool-sep"></div>
+          <button class="editor-tool-btn" id="tool-crop" title="Crop (C)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 2 6 18 22 18"/><polyline points="2 6 18 6 18 22"/></svg>
+          </button>
+          <button class="editor-tool-btn" id="tool-fill" title="Fill (G)">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11l-8-8-8.5 8.5a5.5 5.5 0 0 0 7.78 7.78L19 11z"/><path d="M5 2l5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 2-4 2-4s2 2.4 2 4z"/></svg>
+          </button>
+        </div>
+        <div class="editor-tool-sep"></div>
+        <div id="editor-options">
+          <span class="editor-opt-label">Size</span>
+          <input type="range" id="brush-size-slider" min="1" max="100" value="20" style="width:80px" />
+          <span id="brush-size-val" style="font-size:11px;color:var(--text-faint);min-width:28px">20px</span>
+          <span class="editor-opt-label">Color</span>
+          <input type="color" id="brush-color-picker" value="#cc2800" />
+          <span class="editor-opt-label">Opacity</span>
+          <input type="range" id="editor-opacity-slider" min="1" max="100" value="100" style="width:60px" />
+          <span id="opacity-val" style="font-size:11px;color:var(--text-faint);min-width:30px">100%</span>
+        </div>
+        <div style="flex:1"></div>
+        <input type="text" id="editor-file-name" placeholder="Untitled image…" style="max-width:180px" />
+        <button class="btn btn-primary btn-sm" id="save-image-btn">Save</button>
+        <button class="btn btn-secondary btn-sm" id="export-image-btn">Export PNG</button>
+      </div>
+
+      <!-- Editor body -->
+      <div id="editor-body">
+        <div id="editor-canvas-area">
+          <div class="editor-empty-state" id="editor-empty-state">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--text-faint)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <p style="color:var(--text-faint);font-size:13px">Select an image or create a new one</p>
+            <button class="btn btn-primary" id="new-image-empty-btn" style="margin-top:12px">New Image</button>
+          </div>
+          <canvas id="main-canvas" style="display:none"></canvas>
+        </div>
+
+        <!-- Layers panel -->
+        <div id="layers-panel">
+          <div id="layers-header">
+            <span>Layers</span>
+            <button id="add-layer-btn" title="Add layer">+</button>
+          </div>
+          <div id="layers-list"></div>
+          <div id="layers-adjustments">
+            <label>Brightness <span id="brightness-val">0</span></label>
+            <input type="range" class="adj-slider" id="adj-brightness" min="-100" max="100" value="0" />
+            <label>Contrast <span id="contrast-val">0</span></label>
+            <input type="range" class="adj-slider" id="adj-contrast" min="-100" max="100" value="0" />
+            <label>Saturation <span id="saturation-val">0</span></label>
+            <input type="range" class="adj-slider" id="adj-saturation" min="-100" max="100" value="0" />
+          </div>
+          <div id="editor-history-bar">
+            <button class="hist-btn" id="undo-btn" title="Undo (Ctrl+Z)" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+            </button>
+            <button class="hist-btn" id="redo-btn" title="Redo (Ctrl+Y)" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-4"/></svg>
+            </button>
+            <button class="hist-btn" id="flatten-btn" title="Flatten layers">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><polyline points="8 8 12 4 16 8"/><polyline points="8 16 12 20 16 16"/></svg>
+            </button>
+            <div style="flex:1"></div>
+            <span id="canvas-size-label" style="font-size:10px;color:var(--text-faint)"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── EMAIL SECTION ─────────────────────────────────────── -->
+  <section id="section-email" class="section">
+    <div id="email-setup-banner">
+      <div class="email-setup-inner">
+        <pre style="color:var(--red);line-height:1.2;font-size:12px;margin-bottom:16px;font-family:inherit">
+ ___________
+|           |
+|  _______  |
+| | . @ . | |
+| |_______| |
+|___________|</pre>
+        <h2 style="margin-bottom:8px;">Email not configured</h2>
+        <p class="text-muted" style="margin-bottom:20px;max-width:400px;text-align:center;">Configure your IMAP and SMTP settings to connect your email account.</p>
+        <button class="btn btn-primary" id="email-setup-btn">Configure Email</button>
+      </div>
+    </div>
+    <div id="email-inbox" style="display:none">
+      <div id="email-folders-panel">
+        <div class="panel-header">
+          <span class="panel-title">Folders</span>
+          <button class="btn btn-primary btn-sm" id="compose-btn">Compose</button>
+        </div>
+        <div id="email-folder-list">
+          <div class="email-folder active" data-folder="INBOX"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg> Inbox <span class="folder-count" id="inbox-count"></span></div>
+          <div class="email-folder" data-folder="SENT"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Sent</div>
+          <div class="email-folder" data-folder="unsubscribe"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> Unsubscribe <span class="folder-count" id="unsub-count"></span></div>
+        </div>
+        <div style="padding:8px;border-top:1px solid var(--border)">
+          <button class="btn btn-secondary btn-sm" id="refresh-inbox-btn" style="width:100%">↻ Refresh</button>
+        </div>
+      </div>
+      <div id="email-list-panel">
+        <div class="panel-header">
+          <span class="panel-title" id="email-folder-title">Inbox</span>
+          <div id="email-triage-controls" style="display:flex;gap:6px">
+            <button class="btn btn-secondary btn-sm" id="triage-btn" title="AI triage selected email">⚡ Triage</button>
+          </div>
+        </div>
+        <div id="email-list"></div>
+        <div id="unsub-panel" style="display:none; flex-direction:column; height:100%">
+          <div style="padding:14px 16px; border-bottom:1px solid var(--border)">
+            <p style="color:var(--text-muted); font-size:13px; margin-bottom:12px;">Scan your inbox for mailing lists and newsletter subscriptions.</p>
+            <button class="btn btn-primary" id="scan-unsub-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Scan for Subscriptions
+            </button>
+          </div>
+          <div id="unsub-list" style="flex:1; overflow-y:auto; padding:8px 0"></div>
+        </div>
+      </div>
+      <div id="email-detail-panel" style="display:none">
+        <div id="email-detail-header">
+          <button id="email-back-btn">← Back</button>
+          <div id="email-detail-meta"></div>
+          <div id="email-detail-actions">
+            <button class="btn btn-secondary btn-sm" id="email-reply-btn">Reply</button>
+            <button class="btn btn-primary btn-sm" id="email-triage-single-btn">⚡ AI Triage</button>
+          </div>
+        </div>
+        <div id="email-triage-result" style="display:none"></div>
+        <div id="email-detail-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CALENDAR SECTION ──────────────────────────────────── -->
+  <section id="section-calendar" class="section">
+    <div id="calendar-container">
+      <div id="calendar-header">
+        <button class="cal-nav-btn" id="cal-prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <h2 id="calendar-title">June 2026</h2>
+        <button class="cal-nav-btn" id="cal-next"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></button>
+        <button class="btn btn-secondary btn-sm" id="cal-today">Today</button>
+        <button class="btn btn-primary btn-sm" id="cal-add-event" style="margin-left:auto">+ Add Event</button>
+        <button class="btn btn-secondary btn-sm" id="cal-sync-btn" title="Sync CalDAV">⟳ Sync</button>
+      </div>
+      <div id="calendar-grid-header">
+        <div class="cal-weekday">Sun</div><div class="cal-weekday">Mon</div><div class="cal-weekday">Tue</div>
+        <div class="cal-weekday">Wed</div><div class="cal-weekday">Thu</div><div class="cal-weekday">Fri</div><div class="cal-weekday">Sat</div>
+      </div>
+      <div id="calendar-grid"></div>
+    </div>
+  </section>
+
+  <!-- ── FORGE SECTION ─────────────────────────────────────── -->
+  <section id="section-cookbook" class="section">
+    <div id="cookbook-container">
+      <div id="cookbook-header">
+        <h2 class="section-heading">Forge</h2>
+        <p class="text-muted" style="margin-top:4px;font-size:13px">Scan your hardware and find which open models you can run locally — or browse by tier.</p>
+      </div>
+      <div id="cookbook-hardware" style="margin-bottom:24px">
+        <button class="btn btn-primary" id="scan-hardware-btn">⚙ Detect Hardware</button>
+        <div id="hardware-info" style="display:none;margin-top:16px"></div>
+      </div>
+      <div id="cookbook-models">
+        <div class="section-title" style="margin-bottom:12px">Model Recommendations</div>
+        <div id="cookbook-model-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MEMORY SECTION ─────────────────────────────────────── -->
+  <section id="section-memory" class="section">
+    <div id="memory-container">
+      <div id="memory-header">
+        <h2 class="section-heading">Memory</h2>
+        <div id="memory-controls">
+          <input type="text" id="memory-search" placeholder="Search memories…" />
+          <button class="btn btn-primary btn-sm" id="add-memory-btn">+ Add</button>
+          <button class="btn btn-danger btn-sm" id="clear-memories-btn">Clear all</button>
+        </div>
+        <div class="memory-category-tabs">
+          <button class="memory-cat-btn active" data-cat="">All</button>
+          <button class="memory-cat-btn" data-cat="fact">Facts</button>
+          <button class="memory-cat-btn" data-cat="preference">Preferences</button>
+          <button class="memory-cat-btn" data-cat="contact">Contacts</button>
+          <button class="memory-cat-btn" data-cat="project">Projects</button>
+          <button class="memory-cat-btn" data-cat="goal">Goals</button>
+          <button class="memory-cat-btn" data-cat="general">General</button>
+        </div>
+      </div>
+      <div id="memory-list"></div>
+    </div>
+  </section>
+
+  <div id="sidebar-overlay"></div>
+
+  <!-- Mobile bottom nav -->
+  <nav id="mobile-bottom-nav">
+    <button class="mobile-nav-btn active" data-section="chat">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span class="mobile-nav-label">Chat</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="notes">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="15" y2="18"/></svg>
+      <span class="mobile-nav-label">Notes</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="tasks">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span class="mobile-nav-label">Tasks</span>
+    </button>
+    <button class="mobile-nav-btn" data-section="gallery">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      <span class="mobile-nav-label">Gallery</span>
+    </button>
+    <button class="mobile-nav-btn" id="mobile-more-btn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+      <span class="mobile-nav-label">More</span>
+    </button>
+  </nav>
+
+</div><!-- #app -->
+
+<!-- ── SETTINGS MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="settings-overlay">
+  <div class="modal tall" id="settings-modal">
+    <div class="modal-header">
+      <span class="modal-title">Settings</span>
+      <button class="modal-close" data-close="settings-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="tab-general">General</div>
+        <div class="modal-tab" data-tab="tab-providers">Providers</div>
+        <div class="modal-tab" data-tab="tab-appearance">Appearance</div>
+        <div class="modal-tab" data-tab="tab-shortcuts">Shortcuts</div>
+        <div class="modal-tab" data-tab="tab-email-settings">Email</div>
+        <div class="modal-tab" data-tab="tab-notifications">Alerts</div>
+        <div class="modal-tab" data-tab="tab-tools">Tools</div>
+        <div class="modal-tab" data-tab="tab-calendar-settings">Calendar</div>
+        <div class="modal-tab" data-tab="tab-account">Account</div>
+        <div class="modal-tab admin-only hidden" data-tab="tab-admin">Admin</div>
+        <div class="modal-tab" data-tab="tab-about">About</div>
+      </div>
+
+      <!-- General -->
+      <div class="modal-tab-content active" id="tab-general">
+        <div class="form-group">
+          <label class="form-label">Default Model</label>
+          <select class="form-control" id="setting-default-model"><option value="gpt-4o-mini">gpt-4o-mini</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Default System Prompt</label>
+          <textarea class="form-control" id="setting-system-prompt" rows="4" placeholder="You are a helpful assistant…"></textarea>
+          <div class="form-hint">Applied to all new conversations unless overridden per-conversation.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message History Limit</label>
+          <select class="form-control" id="setting-history-limit">
+            <option value="10">Last 10 messages</option>
+            <option value="20">Last 20 messages</option>
+            <option value="40">Last 40 messages</option>
+            <option value="0">All messages</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Auto-rename conversations</label>
+          <select class="form-control" id="setting-auto-rename">
+            <option value="true">Enabled (after first exchange)</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Providers -->
+      <div class="modal-tab-content" id="tab-providers">
+        <p class="form-hint" style="margin-bottom:14px">API keys are stored in your <code>.env</code> file. Changes here update in-memory only for the current session.</p>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">OAI</span><span class="provider-header-name">OpenAI</span><span class="provider-status-tag" id="status-openai"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-openai" placeholder="sk-…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('openai')">Test</button></div></div><div class="form-hint">GPT-4o, GPT-4o-mini, GPT-4-Turbo, o1, o3</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">ANT</span><span class="provider-header-name">Anthropic</span><span class="provider-status-tag" id="status-anthropic"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-anthropic" placeholder="sk-ant-…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('anthropic')">Test</button></div></div><div class="form-hint">Claude Opus 4, Sonnet 4, Haiku 4</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">GRQ</span><span class="provider-header-name">Groq</span><span class="provider-status-tag" id="status-groq"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-groq" placeholder="gsk_…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('groq')">Test</button></div></div><div class="form-hint">Ultra-fast: Llama, Mixtral, Gemma</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">GEM</span><span class="provider-header-name">Google Gemini</span><span class="provider-status-tag" id="status-gemini"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-gemini" placeholder="AIza…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('gemini')">Test</button></div></div><div class="form-hint">Gemini 2.0 Flash, 1.5 Pro/Flash</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">DSK</span><span class="provider-header-name">DeepSeek</span><span class="provider-status-tag" id="status-deepseek"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-deepseek" placeholder="sk-…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('deepseek')">Test</button></div></div><div class="form-hint">DeepSeek Chat, DeepSeek Reasoner</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">RTR</span><span class="provider-header-name">OpenRouter</span><span class="provider-status-tag" id="status-openrouter"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-openrouter" placeholder="sk-or-…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('openrouter')">Test</button></div></div><div class="form-hint">Access hundreds of models via a single key.</div></div>
+        </div>
+        <div class="provider-section">
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">LLM</span><span class="provider-header-name">Ollama / Local</span><span class="provider-status-tag" id="status-ollama"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body">
+            <div class="form-group"><label class="form-label">Ollama Host URL</label><div class="input-group"><input type="text" class="form-control" id="key-ollama" placeholder="http://localhost:11434" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('ollama')">Test</button></div></div>
+            <div class="form-hint">Run models locally. See <strong>Forge</strong> for hardware requirements. Also works with llama.cpp, vLLM, LM Studio.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Appearance -->
+      <div class="modal-tab-content" id="tab-appearance">
+        <div class="form-group">
+          <label class="form-label">Theme</label>
+          <div class="theme-swatches" id="theme-swatches">
+            <div class="theme-swatch active" data-theme="dragon"><div class="swatch-preview" style="background:#0d0a09"><div class="swatch-dot" style="background:#cc2800"></div><div class="swatch-dot" style="background:#f0e0d0"></div><div class="swatch-dot" style="background:#1a0e0b"></div></div><div class="swatch-label" style="background:#1a0e0b;color:#f0e0d0">Y Ddraig</div></div>
+            <div class="theme-swatch" data-theme="annwn"><div class="swatch-preview" style="background:#08080f"><div class="swatch-dot" style="background:#7055dd"></div><div class="swatch-dot" style="background:#c8d0e8"></div><div class="swatch-dot" style="background:#0e0e1e"></div></div><div class="swatch-label" style="background:#0e0e1e;color:#c8d0e8">Annwn</div></div>
+            <div class="theme-swatch" data-theme="eryri"><div class="swatch-preview" style="background:#181e22"><div class="swatch-dot" style="background:#8ab4c8"></div><div class="swatch-dot" style="background:#d8dce0"></div><div class="swatch-dot" style="background:#22282e"></div></div><div class="swatch-label" style="background:#22282e;color:#d8dce0">Eryri</div></div>
+            <div class="theme-swatch" data-theme="mabinogi"><div class="swatch-preview" style="background:#f2ebe0"><div class="swatch-dot" style="background:#8b3218"></div><div class="swatch-dot" style="background:#2a1c0e"></div><div class="swatch-dot" style="background:#e8dfc8"></div></div><div class="swatch-label" style="background:#e8dfc8;color:#2a1c0e">Mabinogi</div></div>
+            <div class="theme-swatch" data-theme="coed"><div class="swatch-preview" style="background:#080e08"><div class="swatch-dot" style="background:#4a9038"></div><div class="swatch-dot" style="background:#c0d4b8"></div><div class="swatch-dot" style="background:#0e1a0e"></div></div><div class="swatch-label" style="background:#0e1a0e;color:#c0d4b8">Coed</div></div>
+            <div class="theme-swatch" data-theme="mor"><div class="swatch-preview" style="background:#060810"><div class="swatch-dot" style="background:#2a8ab8"></div><div class="swatch-dot" style="background:#b8ccd8"></div><div class="swatch-dot" style="background:#0c1020"></div></div><div class="swatch-label" style="background:#0c1020;color:#b8ccd8">Mor Cymru</div></div>
+            <div class="theme-swatch" data-theme="midnight"><div class="swatch-preview" style="background:#060910"><div class="swatch-dot" style="background:#5080f0"></div><div class="swatch-dot" style="background:#d0d8f0"></div><div class="swatch-dot" style="background:#0c1018"></div></div><div class="swatch-label" style="background:#0c1018;color:#d0d8f0">Midnight</div></div>
+            <div class="theme-swatch" data-theme="cyberpunk"><div class="swatch-preview" style="background:#08010f"><div class="swatch-dot" style="background:#e040e0"></div><div class="swatch-dot" style="background:#f0c8f0"></div><div class="swatch-dot" style="background:#120618"></div></div><div class="swatch-label" style="background:#120618;color:#f0c8f0">Cyberpunk</div></div>
+            <div class="theme-swatch" data-theme="retrowave"><div class="swatch-preview" style="background:#0a0414"><div class="swatch-dot" style="background:#f040a0"></div><div class="swatch-dot" style="background:#ffd0f0"></div><div class="swatch-dot" style="background:#14062a"></div></div><div class="swatch-label" style="background:#14062a;color:#ffd0f0">Retrowave</div></div>
+            <div class="theme-swatch" data-theme="forest"><div class="swatch-preview" style="background:#060c06"><div class="swatch-dot" style="background:#60c040"></div><div class="swatch-dot" style="background:#c8e0b0"></div><div class="swatch-dot" style="background:#0c180c"></div></div><div class="swatch-label" style="background:#0c180c;color:#c8e0b0">Forest</div></div>
+            <div class="theme-swatch" data-theme="ocean"><div class="swatch-preview" style="background:#040810"><div class="swatch-dot" style="background:#3090e0"></div><div class="swatch-dot" style="background:#b0d0f0"></div><div class="swatch-dot" style="background:#080e1c"></div></div><div class="swatch-label" style="background:#080e1c;color:#b0d0f0">Ocean</div></div>
+            <div class="theme-swatch" data-theme="terminal"><div class="swatch-preview" style="background:#000800"><div class="swatch-dot" style="background:#00ff00"></div><div class="swatch-dot" style="background:#00d000"></div><div class="swatch-dot" style="background:#001000"></div></div><div class="swatch-label" style="background:#001000;color:#00d000">Terminal</div></div>
+            <div class="theme-swatch" data-theme="amber"><div class="swatch-preview" style="background:#0c0800"><div class="swatch-dot" style="background:#e0a020"></div><div class="swatch-dot" style="background:#f0c860"></div><div class="swatch-dot" style="background:#1a1200"></div></div><div class="swatch-label" style="background:#1a1200;color:#f0c860">Amber</div></div>
+            <div class="theme-swatch" data-theme="light"><div class="swatch-preview" style="background:#f5f5f5"><div class="swatch-dot" style="background:#d04020"></div><div class="swatch-dot" style="background:#1a1a1a"></div><div class="swatch-dot" style="background:#ffffff"></div></div><div class="swatch-label" style="background:#ffffff;color:#1a1a1a">Light</div></div>
+            <div class="theme-swatch" data-theme="custom" id="custom-theme-swatch"><div class="swatch-preview" style="background:#0d0a09"><div class="swatch-dot" id="custom-swatch-dot1" style="background:#cc2800"></div><div class="swatch-dot" id="custom-swatch-dot2" style="background:#f0e0d0"></div><div class="swatch-dot" id="custom-swatch-dot3" style="background:#1a0e0b"></div></div><div class="swatch-label" id="custom-swatch-label" style="background:#1a0e0b;color:#f0e0d0">Custom</div></div>
+          </div>
+        </div>
+
+        <!-- Custom theme creator -->
+        <div id="custom-theme-creator">
+          <div class="section-title" style="margin-bottom:10px">Custom Theme Colors</div>
+          <div class="color-grid">
+            <div class="color-row"><label>Background</label><input type="color" id="c-bg" value="#0d0a09" /></div>
+            <div class="color-row"><label>Foreground</label><input type="color" id="c-fg" value="#f0e0d0" /></div>
+            <div class="color-row"><label>Panel</label><input type="color" id="c-panel" value="#1a0e0b" /></div>
+            <div class="color-row"><label>Panel 2</label><input type="color" id="c-panel2" value="#241410" /></div>
+            <div class="color-row"><label>Border</label><input type="color" id="c-border" value="#3d1a12" /></div>
+            <div class="color-row"><label>Accent</label><input type="color" id="c-accent" value="#cc2800" /></div>
+            <div class="color-row"><label>Muted text</label><input type="color" id="c-muted" value="#9a7a68" /></div>
+            <div class="color-row"><label>Code bg</label><input type="color" id="c-codebg" value="#0a0806" /></div>
+          </div>
+          <div class="color-preview-bar" id="theme-preview-bar" style="margin-top:12px">
+            <div class="color-preview-seg" id="prev-bg" style="background:#0d0a09;border-radius:3px 0 0 3px"></div>
+            <div class="color-preview-seg" id="prev-panel" style="background:#1a0e0b"></div>
+            <div class="color-preview-seg" id="prev-accent" style="background:#cc2800"></div>
+            <div class="color-preview-seg" id="prev-fg" style="background:#f0e0d0;border-radius:0 3px 3px 0"></div>
+          </div>
+          <button class="btn btn-primary btn-sm" id="apply-custom-theme-btn" style="margin-top:10px;width:100%">Apply Custom Theme</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Animated Background</label>
+          <div class="bg-pattern-grid">
+            <button class="bg-pattern-btn active" data-anim="none">None</button>
+            <button class="bg-pattern-btn" data-anim="synapse">Synapse</button>
+            <button class="bg-pattern-btn" data-anim="rain">Rain</button>
+            <button class="bg-pattern-btn" data-anim="stars">Stars</button>
+            <button class="bg-pattern-btn" data-anim="sparkles">Sparkles</button>
+            <button class="bg-pattern-btn" data-anim="embers">Embers</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Static Pattern</label>
+          <div class="bg-pattern-grid">
+            <button class="bg-pattern-btn active" data-pattern="none">None</button>
+            <button class="bg-pattern-btn" data-pattern="dots">Dots</button>
+            <button class="bg-pattern-btn" data-pattern="grid">Grid</button>
+            <button class="bg-pattern-btn" data-pattern="noise">Noise</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Font Family</label>
+          <div class="font-options">
+            <button class="font-btn font-mono active" data-font="mono">Monospace</button>
+            <button class="font-btn font-sans" data-font="sans">Sans-serif</button>
+            <button class="font-btn font-serif" data-font="serif">Serif</button>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Font Size</label>
+            <select class="form-control" id="setting-font-size">
+              <option value="sm">Small</option>
+              <option value="md" selected>Medium</option>
+              <option value="lg">Large</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Density</label>
+            <select class="form-control" id="setting-density">
+              <option value="">Comfortable</option>
+              <option value="density-compact">Compact</option>
+              <option value="density-spacious">Spacious</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Accent Color Override</label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input type="color" id="accent-color-picker" style="width:48px;height:36px" />
+            <button class="btn btn-secondary btn-sm" id="reset-accent-btn">Reset</button>
+            <span class="form-hint" style="margin:0">Overrides theme accent color</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shortcuts -->
+      <div class="modal-tab-content" id="tab-shortcuts">
+        <p class="form-hint" style="margin-bottom:16px">Click a shortcut to rebind it, then press the new key combination.</p>
+        <div id="shortcuts-list">
+          <div class="shortcut-item"><span class="shortcut-action">Send message</span><div class="shortcut-keys-display"><kbd>Enter</kbd></div><button class="shortcut-edit-btn" data-action="send">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">New conversation</span><div class="shortcut-keys-display" id="sk-new-chat"><kbd>Ctrl</kbd>+<kbd>N</kbd></div><button class="shortcut-edit-btn" data-action="new-chat">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Toggle sidebar</span><div class="shortcut-keys-display" id="sk-sidebar"><kbd>Ctrl</kbd>+<kbd>B</kbd></div><button class="shortcut-edit-btn" data-action="sidebar">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Open settings</span><div class="shortcut-keys-display" id="sk-settings"><kbd>Ctrl</kbd>+<kbd>,</kbd></div><button class="shortcut-edit-btn" data-action="settings">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Save (document/note)</span><div class="shortcut-keys-display" id="sk-save"><kbd>Ctrl</kbd>+<kbd>S</kbd></div><button class="shortcut-edit-btn" data-action="save">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Show shortcuts</span><div class="shortcut-keys-display" id="sk-shortcuts"><kbd>Ctrl</kbd>+<kbd>/</kbd></div><button class="shortcut-edit-btn" data-action="shortcuts">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Navigate to Chat</span><div class="shortcut-keys-display" id="sk-chat"><kbd>Ctrl</kbd>+<kbd>1</kbd></div><button class="shortcut-edit-btn" data-action="nav-chat">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Navigate to Notes</span><div class="shortcut-keys-display" id="sk-notes"><kbd>Ctrl</kbd>+<kbd>2</kbd></div><button class="shortcut-edit-btn" data-action="nav-notes">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Navigate to Tasks</span><div class="shortcut-keys-display" id="sk-tasks"><kbd>Ctrl</kbd>+<kbd>3</kbd></div><button class="shortcut-edit-btn" data-action="nav-tasks">Edit</button></div>
+          <div class="shortcut-item"><span class="shortcut-action">Navigate to Gallery</span><div class="shortcut-keys-display" id="sk-gallery"><kbd>Ctrl</kbd>+<kbd>4</kbd></div><button class="shortcut-edit-btn" data-action="nav-gallery">Edit</button></div>
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-secondary btn-sm" id="reset-shortcuts-btn">Reset all to defaults</button>
+      </div>
+
+      <!-- Email Settings -->
+      <div class="modal-tab-content" id="tab-email-settings">
+        <p class="form-hint" style="margin-bottom:16px">Credentials are stored locally in the database.</p>
+        <p class="section-title">IMAP (Incoming)</p>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">IMAP Host</label><input type="text" class="form-control" id="email-imap-host" placeholder="imap.gmail.com" /></div>
+          <div class="form-group" style="max-width:120px"><label class="form-label">Port</label><input type="number" class="form-control" id="email-imap-port" value="993" /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Username</label><input type="text" class="form-control" id="email-imap-username" placeholder="you@example.com" autocomplete="off" /></div>
+        <div class="form-group"><label class="form-label">Password / App Password</label><input type="password" class="form-control" id="email-imap-password" autocomplete="off" /></div>
+        <div class="divider"></div>
+        <p class="section-title">SMTP (Outgoing)</p>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">SMTP Host</label><input type="text" class="form-control" id="email-smtp-host" placeholder="smtp.gmail.com" /></div>
+          <div class="form-group" style="max-width:120px"><label class="form-label">Port</label><input type="number" class="form-control" id="email-smtp-port" value="587" /></div>
+        </div>
+        <div class="form-group"><label class="form-label">Username</label><input type="text" class="form-control" id="email-smtp-username" placeholder="you@example.com" autocomplete="off" /></div>
+        <div class="form-group"><label class="form-label">Password / App Password</label><input type="password" class="form-control" id="email-smtp-password" autocomplete="off" /></div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" id="save-email-settings-btn">Save Email Settings</button>
+      </div>
+
+      <!-- Notifications -->
+      <div class="modal-tab-content" id="tab-notifications">
+        <div class="form-group">
+          <label class="form-label">Browser Push Notifications</label>
+          <p class="form-hint" style="margin-bottom:12px">Enable push notifications to get task reminders and alerts even when the app is in the background.</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-primary" id="enable-notifications-btn">Enable Notifications</button>
+            <button class="btn btn-secondary" id="test-notification-btn">Send Test</button>
+            <span id="notification-status" class="form-hint" style="margin:0"></span>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <label class="form-label">Task Due Date Reminders</label>
+          <select class="form-control" id="setting-reminder-advance">
+            <option value="0">At due time</option>
+            <option value="15">15 minutes before</option>
+            <option value="30" selected>30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tools -->
+      <div class="modal-tab-content" id="tab-tools">
+        <div class="form-group">
+          <label class="form-label">SearXNG URL</label>
+          <input type="text" class="form-control" id="setting-searxng-url" placeholder="http://localhost:8080" />
+          <div class="form-hint">Self-hosted SearXNG instance for Agent web search and Deep Research.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Code Execution</label>
+          <select class="form-control" id="setting-code-exec">
+            <option value="true">Enabled (runs Python in sandbox)</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" id="save-tools-settings-btn">Save Tool Settings</button>
+      </div>
+
+      <!-- Calendar Settings -->
+      <div class="modal-tab-content" id="tab-calendar-settings">
+        <div class="form-group">
+          <label class="form-label">CalDAV Server URL</label>
+          <input type="text" class="form-control" id="caldav-url" placeholder="https://cloud.example.com/remote.php/dav/calendars/user/" />
+          <div class="form-hint">Nextcloud, Apple iCloud, Fastmail, Radicale, etc.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-control" id="caldav-username" placeholder="your username" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password / App Password</label>
+          <input type="password" class="form-control" id="caldav-password" autocomplete="off" />
+        </div>
+        <div class="divider"></div>
+        <button class="btn btn-primary" id="save-caldav-btn">Save CalDAV Settings</button>
+      </div>
+
+      <!-- Account -->
+      <div class="modal-tab-content" id="tab-account">
+        <div class="account-info-card" id="account-info-card">
+          <div class="account-avatar-large" id="account-avatar">?</div>
+          <div class="account-meta">
+            <div class="account-username" id="account-username">Loading…</div>
+            <div class="account-role">Role: <span class="role-badge" id="account-role-badge">user</span></div>
+          </div>
+          <button class="btn btn-danger btn-sm" id="logout-btn">Sign Out</button>
+        </div>
+        <div class="divider"></div>
+        <p class="section-title">Change Password</p>
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" class="form-control" id="pw-current" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" class="form-control" id="pw-new" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" class="form-control" id="pw-confirm" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary" id="change-password-btn">Change Password</button>
+        <div id="pw-error" class="form-hint" style="color:var(--red);display:none;margin-top:8px"></div>
+      </div>
+
+      <!-- Admin -->
+      <div class="modal-tab-content" id="tab-admin">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <p class="section-title" style="margin-bottom:0">User Management</p>
+          <button class="btn btn-primary btn-sm" id="add-user-btn">+ Add User</button>
+        </div>
+        <table class="users-table">
+          <thead><tr><th>Username</th><th>Role</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody id="users-table-body"></tbody>
+        </table>
+        <div class="divider"></div>
+        <div id="add-user-form" style="display:none">
+          <p class="section-title">New User</p>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">Username</label><input type="text" class="form-control" id="new-username" /></div>
+            <div class="form-group"><label class="form-label">Password</label><input type="password" class="form-control" id="new-user-password" /></div>
+          </div>
+          <div class="form-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="new-user-admin">
+              <div class="toggle-track"><div class="toggle-thumb"></div></div>
+              <span class="toggle-label">Admin privileges</span>
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" id="create-user-btn">Create User</button>
+            <button class="btn btn-secondary btn-sm" id="cancel-add-user-btn">Cancel</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- About -->
+      <div class="modal-tab-content" id="tab-about">
+        <pre style="text-align:center; padding:20px 0 10px; color:var(--red); font-size:12px; line-height:1.25; font-family:inherit; margin:0">    /\        /\
+   /  \  /\  /  \
+  / /\ \/  \/ /\ \
+ /_/  \_\  /_/  \_\</pre>
+        <h2 style="text-align:center; margin-bottom:6px; font-size:22px;">Glyndwr</h2>
+        <p style="text-align:center; color:var(--text-muted); margin-bottom:24px;">Self-hosted AI Workspace &mdash; v1.2.0</p>
+        <div class="divider"></div>
+        <p class="section-title">Keyboard Shortcuts</p>
+        <div class="shortcuts-grid">
+          <div class="shortcut-keys"><kbd>Enter</kbd></div><div>Send message</div>
+          <div class="shortcut-keys"><kbd>Shift</kbd>+<kbd>Enter</kbd></div><div>New line in message</div>
+          <div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>N</kbd></div><div>New conversation</div>
+          <div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>B</kbd></div><div>Toggle sidebar</div>
+          <div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>/</kbd></div><div>Show shortcuts</div>
+          <div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>S</kbd></div><div>Save (document / note)</div>
+          <div class="shortcut-keys"><kbd>Ctrl</kbd>+<kbd>1-4</kbd></div><div>Navigate sections</div>
+          <div class="shortcut-keys"><kbd>Esc</kbd></div><div>Close modal</div>
+        </div>
+        <div class="divider"></div>
+        <div class="form-group">
+          <button class="btn btn-primary" id="install-pwa-btn" style="display:none">Install Glyndwr App</button>
+          <p class="form-hint" id="pwa-install-hint"></p>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="settings-overlay">Close</button>
+      <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SYSTEM PROMPT MODAL ────────────────────────────────── -->
+<div class="modal-overlay hidden" id="sysprompt-overlay">
+  <div class="modal" style="width:500px">
+    <div class="modal-header"><span class="modal-title">System Prompt</span><button class="modal-close" data-close="sysprompt-overlay">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group">
+        <textarea class="form-control" id="conv-system-prompt" rows="8" placeholder="You are a helpful assistant…"></textarea>
+        <div class="form-hint">Defines the AI's behavior for this conversation.</div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" data-close="sysprompt-overlay">Cancel</button><button class="btn btn-primary" id="save-sysprompt-btn">Apply</button></div>
+  </div>
+</div>
+
+<!-- ── COMPARE MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="compare-overlay">
+  <div class="modal wide" id="compare-modal">
+    <div class="modal-header"><span class="modal-title">Compare Models</span><button class="modal-close" data-close="compare-overlay">✕</button></div>
+    <div class="modal-body" style="padding:0">
+      <div class="compare-panes">
+        <div class="compare-pane">
+          <div class="compare-pane-header"><span style="font-size:12px;color:var(--text-muted)">Model A:</span><select id="compare-model-a"></select></div>
+          <div class="compare-messages" id="compare-messages-a"></div>
+        </div>
+        <div class="compare-pane">
+          <div class="compare-pane-header"><span style="font-size:12px;color:var(--text-muted)">Model B:</span><select id="compare-model-b"></select></div>
+          <div class="compare-messages" id="compare-messages-b"></div>
+        </div>
+      </div>
+      <div class="compare-input-area">
+        <textarea id="compare-input" placeholder="Type a message to send to both models…" rows="2"></textarea>
+        <button class="compare-send-btn" id="compare-send-btn">Send to Both</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── COMPOSE EMAIL MODAL ────────────────────────────────── -->
+<div class="modal-overlay hidden" id="compose-overlay">
+  <div class="modal" style="width:560px">
+    <div class="modal-header"><span class="modal-title">New Message</span><button class="modal-close" data-close="compose-overlay">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">To</label><input type="text" class="form-control" id="compose-to" placeholder="recipient@example.com" /></div>
+      <div class="form-group"><label class="form-label">Subject</label><input type="text" class="form-control" id="compose-subject" /></div>
+      <div class="form-group"><label class="form-label">Body</label><textarea class="form-control" id="compose-body" rows="8"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" data-close="compose-overlay">Cancel</button><button class="btn btn-primary" id="compose-send-email-btn">Send</button></div>
+  </div>
+</div>
+
+<!-- ── ADD MEMORY MODAL ───────────────────────────────────── -->
+<div class="modal-overlay hidden" id="add-memory-overlay">
+  <div class="modal" style="width:480px">
+    <div class="modal-header"><span class="modal-title">Add Memory</span><button class="modal-close" data-close="add-memory-overlay">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Title</label><input type="text" class="form-control" id="mem-title" placeholder="Brief title…" /></div>
+      <div class="form-group"><label class="form-label">Content</label><textarea class="form-control" id="mem-content" rows="4" placeholder="What should be remembered?"></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <select class="form-control" id="mem-category">
+          <option value="general">General</option>
+          <option value="fact">Fact</option>
+          <option value="preference">Preference</option>
+          <option value="contact">Contact</option>
+          <option value="project">Project</option>
+          <option value="goal">Goal</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" data-close="add-memory-overlay">Cancel</button><button class="btn btn-primary" id="save-memory-btn">Save Memory</button></div>
+  </div>
+</div>
+
+<!-- ── NEW IMAGE MODAL ────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="new-image-overlay">
+  <div class="modal" style="width:380px">
+    <div class="modal-header"><span class="modal-title">New Image</span><button class="modal-close" data-close="new-image-overlay">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Name</label><input type="text" class="form-control" id="new-img-name" placeholder="My Image" /></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Width (px)</label><input type="number" class="form-control" id="new-img-width" value="800" min="1" max="4096" /></div>
+        <div class="form-group"><label class="form-label">Height (px)</label><input type="number" class="form-control" id="new-img-height" value="600" min="1" max="4096" /></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Background</label>
+        <select class="form-control" id="new-img-bg">
+          <option value="transparent">Transparent</option>
+          <option value="white">White</option>
+          <option value="black">Black</option>
+          <option value="custom">Custom…</option>
+        </select>
+      </div>
+      <div class="form-hint">Or drag and drop an image into the gallery to open it for editing.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" data-close="new-image-overlay">Cancel</button><button class="btn btn-primary" id="create-image-btn">Create</button></div>
+  </div>
+</div>
+
+<!-- ── Server offline banner ────────────────────────────── -->
+<div id="server-offline-banner">
+  ⚠ Cannot reach the server — run <code>.\launch.ps1</code> (Windows) or <code>./launch.sh</code> (Mac/Linux) in the project folder, then refresh this page.
+</div>
+
+<div id="toast-container"></div>
+<div class="context-menu hidden" id="context-menu">
+  <div class="context-menu-item" id="ctx-pin">[*] Pin</div>
+  <div class="context-menu-item" id="ctx-rename">[/] Rename</div>
+  <div class="context-menu-sep"></div>
+  <div class="context-menu-item danger" id="ctx-delete">[x] Delete</div>
+</div>
+
+<script src="/static/js/image-editor.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

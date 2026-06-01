@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glyndwr — Sign In</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⊕</text></svg>" />
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      background: #0d0a09;
+      color: #f0e0d0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    #bg-canvas {
+      position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: 0.4;
+    }
+    .login-card {
+      background: #1a0e0b;
+      border: 1px solid #3d1a12;
+      border-radius: 20px;
+      padding: 40px;
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+    }
+    .logo { text-align: center; margin-bottom: 28px; }
+    .logo-icon { font-size: 48px; color: #cc2800; line-height: 1; display: block; margin-bottom: 10px; }
+    .logo-title { font-size: 22px; font-weight: 700; letter-spacing: 0.3em; color: #f0e0d0; }
+    .logo-sub { font-size: 12px; color: #9a7a68; margin-top: 4px; letter-spacing: 0.1em; }
+    h2 { font-size: 16px; font-weight: 700; margin-bottom: 20px; color: #f0e0d0; text-align: center; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 11px; font-weight: 600; color: #9a7a68; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.08em; }
+    input {
+      width: 100%;
+      background: #241410;
+      border: 1.5px solid #3d1a12;
+      border-radius: 10px;
+      padding: 10px 14px;
+      color: #f0e0d0;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #cc2800; }
+    input::placeholder { color: #5a3a28; }
+    .btn {
+      width: 100%;
+      background: #cc2800;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s;
+      letter-spacing: 0.05em;
+      margin-top: 8px;
+    }
+    .btn:hover { background: #e03000; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .error {
+      background: rgba(204,40,0,0.1);
+      border: 1px solid rgba(204,40,0,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #cc2800;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .hint { font-size: 11px; color: #9a7a68; text-align: center; margin-top: 16px; }
+    .setup-badge {
+      background: rgba(204,40,0,0.1);
+      border: 1px solid rgba(204,40,0,0.3);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: #9a7a68;
+      margin-bottom: 20px;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .setup-badge strong { color: #cc2800; }
+    #view-login, #view-setup { display: none; }
+    #view-login.active, #view-setup.active { display: block; }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<canvas id="bg-canvas"></canvas>
+
+<div class="login-card">
+  <div class="logo">
+    <span class="logo-icon">⊕</span>
+    <div class="logo-title">GLYNDWR</div>
+    <div class="logo-sub">Self-hosted AI Workspace</div>
+  </div>
+
+  <!-- Login view -->
+  <div id="view-login">
+    <h2>Sign In</h2>
+    <div class="error" id="login-error"></div>
+    <div class="form-group">
+      <label>Username</label>
+      <input type="text" id="login-username" placeholder="your username" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+    <button class="btn" id="login-btn">Sign In</button>
+    <p class="hint">Glyndwr is a private, self-hosted workspace.</p>
+  </div>
+
+  <!-- First-run setup view -->
+  <div id="view-setup">
+    <h2>First-time Setup</h2>
+    <div class="setup-badge">
+      No accounts exist yet. Create your <strong>admin account</strong> to get started.
+    </div>
+    <div class="error" id="setup-error"></div>
+    <div class="form-group">
+      <label>Admin Username</label>
+      <input type="text" id="setup-username" placeholder="admin" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="setup-password" placeholder="at least 6 characters" autocomplete="new-password" />
+    </div>
+    <div class="form-group">
+      <label>Confirm Password</label>
+      <input type="password" id="setup-confirm" placeholder="repeat password" autocomplete="new-password" />
+    </div>
+    <button class="btn" id="setup-btn">Create Admin Account</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  // Animated background
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, nodes = [];
+  function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+  for (let i = 0; i < 30; i++) {
+    nodes.push({
+      x: Math.random() * 1000, y: Math.random() * 1000,
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2 + 1, pulse: Math.random() * Math.PI * 2,
+    });
+  }
+  function animate() {
+    ctx.clearRect(0, 0, W, H);
+    nodes.forEach(n => {
+      n.x += n.vx; n.y += n.vy; n.pulse += 0.02;
+      if (n.x < 0 || n.x > W) n.vx *= -1;
+      if (n.y < 0 || n.y > H) n.vy *= -1;
+    });
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[i].x - nodes[j].x, dy = nodes[i].y - nodes[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 150) {
+          ctx.beginPath();
+          ctx.moveTo(nodes[i].x, nodes[i].y);
+          ctx.lineTo(nodes[j].x, nodes[j].y);
+          ctx.strokeStyle = `rgba(204,40,0,${0.15 * (1 - dist / 150)})`;
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
+      }
+    }
+    nodes.forEach(n => {
+      const glow = 0.6 + 0.4 * Math.sin(n.pulse);
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.r * glow, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(204,40,0,${0.4 * glow})`;
+      ctx.fill();
+    });
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  // Auth logic
+  async function checkStatus() {
+    try {
+      const r = await fetch('/api/auth/status');
+      const d = await r.json();
+      if (d.needs_setup) {
+        document.getElementById('view-setup').classList.add('active');
+      } else {
+        document.getElementById('view-login').classList.add('active');
+      }
+    } catch {
+      document.getElementById('view-login').classList.add('active');
+    }
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function hideError(id) { document.getElementById(id).style.display = 'none'; }
+
+  async function doLogin() {
+    hideError('login-error');
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    if (!username || !password) { showError('login-error', 'Please enter username and password.'); return; }
+    const btn = document.getElementById('login-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Signing in…';
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        showError('login-error', d.detail || 'Login failed.');
+        btn.disabled = false; btn.textContent = 'Sign In';
+        return;
+      }
+      const d = await r.json();
+      localStorage.setItem('glyndwr_token', d.token);
+      localStorage.setItem('glyndwr_user', JSON.stringify(d.user));
+      window.location.href = '/';
+    } catch {
+      showError('login-error', 'Could not connect to server.');
+      btn.disabled = false; btn.textContent = 'Sign In';
+    }
+  }
+
+  async function doSetup() {
+    hideError('setup-error');
+    const username = document.getElementById('setup-username').value.trim();
+    const password = document.getElementById('setup-password').value;
+    const confirm = document.getElementById('setup-confirm').value;
+    if (!username) { showError('setup-error', 'Please enter a username.'); return; }
+    if (password.length < 6) { showError('setup-error', 'Password must be at least 6 characters.'); return; }
+    if (password !== confirm) { showError('setup-error', 'Passwords do not match.'); return; }
+    const btn = document.getElementById('setup-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Creating account…';
+    try {
+      const r = await fetch('/api/auth/setup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, is_admin: true }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        showError('setup-error', d.detail || 'Setup failed.');
+        btn.disabled = false; btn.textContent = 'Create Admin Account';
+        return;
+      }
+      // Now login
+      const lr = await fetch('/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const ld = await lr.json();
+      localStorage.setItem('glyndwr_token', ld.token);
+      localStorage.setItem('glyndwr_user', JSON.stringify(ld.user));
+      window.location.href = '/';
+    } catch {
+      showError('setup-error', 'Could not connect to server.');
+      btn.disabled = false; btn.textContent = 'Create Admin Account';
+    }
+  }
+
+  document.getElementById('login-btn').addEventListener('click', doLogin);
+  document.getElementById('setup-btn').addEventListener('click', doSetup);
+
+  document.getElementById('login-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('login-username').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('login-password').focus();
+  });
+
+  // Check if already logged in
+  const existingToken = localStorage.getItem('glyndwr_token');
+  if (existingToken) {
+    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${existingToken}` } })
+      .then(r => { if (r.ok) window.location.href = '/'; else checkStatus(); })
+      .catch(() => checkStatus());
+  } else {
+    checkStatus();
+  }
+})();
+</script>
+</body>
+</html>

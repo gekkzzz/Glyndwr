@@ -112,6 +112,9 @@ async def send_message(conv_id: str, body: MessageRequest):
     system_prompt = body.system_prompt if body.system_prompt is not None else conv.get("system_prompt", "")
     provider = _get_provider_for_model(model)
 
+    # Read API keys + Ollama host from the database so users never need .env
+    db_settings = await db.get_all_settings()
+
     # Save user message
     await db.add_message(
         conversation_id=conv_id,
@@ -138,6 +141,7 @@ async def send_message(conv_id: str, body: MessageRequest):
                 model=model,
                 messages=llm_messages,
                 system_prompt=system_prompt,
+                db_settings=db_settings,
             ):
                 yield chunk
                 # Parse to accumulate response

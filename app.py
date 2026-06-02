@@ -36,6 +36,29 @@ async def lifespan(app: FastAPI):
         import logging
         logging.error(f"Database init failed: {e}")
         raise
+
+    # Auto-create admin on first run
+    from core.database import get_user_count, create_user
+    import secrets
+    import string
+    count = await get_user_count()
+    if count == 0:
+        pw_chars = string.ascii_letters + string.digits + "!@#$%"
+        generated_pw = ''.join(secrets.choice(pw_chars) for _ in range(16))
+        await create_user("admin", generated_pw, is_admin=True)
+        sep = "=" * 54
+        print(f"\n{sep}")
+        print(f"  GLYNDWR -- First Run Setup")
+        print(sep)
+        print(f"  Admin account created automatically.")
+        print(f"")
+        print(f"  Username : admin")
+        print(f"  Password : {generated_pw}")
+        print(f"")
+        print(f"  Sign in at http://localhost:7860/login")
+        print(f"  Change credentials in Settings -> Account")
+        print(f"{sep}\n")
+
     yield
 
 

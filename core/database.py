@@ -114,10 +114,18 @@ async def init_db():
                 user_id TEXT DEFAULT NULL
             )
         """)
-        try:
-            await db.execute("ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT NULL")
-        except Exception:
-            pass
+        # ── Migrations: add columns that may be missing from older databases ──
+        migrations = [
+            "ALTER TABLE tasks ADD COLUMN due_date TEXT DEFAULT NULL",
+            "ALTER TABLE tasks ADD COLUMN user_id TEXT DEFAULT NULL",
+            "ALTER TABLE conversations ADD COLUMN user_id TEXT DEFAULT NULL",
+            "ALTER TABLE notes ADD COLUMN user_id TEXT DEFAULT NULL",
+        ]
+        for sql in migrations:
+            try:
+                await db.execute(sql)
+            except Exception:
+                pass  # column already exists
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS calendar_events (

@@ -1,120 +1,95 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Glyndwr launcher for Windows PowerShell
-.DESCRIPTION
-    Checks Python, creates/activates venv, installs deps, runs the server, opens browser.
-#>
-
+param()
 $ErrorActionPreference = 'Stop'
 
-# ── Colors ──────────────────────────────────────────────────────────────────
-function Write-Step   { param($msg) Write-Host "  ➜  $msg" -ForegroundColor Cyan }
-function Write-OK     { param($msg) Write-Host "  ✓  $msg" -ForegroundColor Green }
-function Write-Warn   { param($msg) Write-Host "  ⚠  $msg" -ForegroundColor Yellow }
-function Write-Err    { param($msg) Write-Host "  ✗  $msg" -ForegroundColor Red }
-function Write-Banner {
-    Write-Host ""
-    Write-Host "  ⊕  Glyndwr — Self-hosted AI Workspace" -ForegroundColor Magenta
-    Write-Host "  ──────────────────────────────────────" -ForegroundColor DarkGray
-    Write-Host ""
-}
-
-Write-Banner
-
-# ── Script directory ────────────────────────────────────────────────────────
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 Set-Location $ScriptDir
 
-# ── Check Python ────────────────────────────────────────────────────────────
-Write-Step "Checking Python installation…"
+Write-Host ""
+Write-Host "  Glyndwr -- Self-hosted AI Workspace" -ForegroundColor Magenta
+Write-Host ""
 
+# ── Python ────────────────────────────────────────────────────
 $PythonCmd = $null
 foreach ($cmd in @('python', 'python3', 'py')) {
     try {
         $ver = & $cmd --version 2>&1
-        if ($ver -match 'Python (\d+)\.(\d+)') {
-            $major = [int]$Matches[1]
-            $minor = [int]$Matches[2]
-            if ($major -ge 3 -and $minor -ge 9) {
-                $PythonCmd = $cmd
-                Write-OK "Found $ver"
-                break
-            }
+        if ($ver -match 'Python (\d+)\.(\d+)' -and [int]$Matches[1] -ge 3 -and [int]$Matches[2] -ge 9) {
+            $PythonCmd = $cmd; break
         }
     } catch {}
 }
-
 if (-not $PythonCmd) {
-    Write-Err "Python 3.9+ not found. Please install from https://python.org"
-    exit 1
+    Write-Host "  Python 3.9+ not found. Install from https://python.org" -ForegroundColor Red; exit 1
 }
 
-# ── Create/activate venv ────────────────────────────────────────────────────
-$VenvDir = Join-Path $ScriptDir '.venv'
-if (-not (Test-Path $VenvDir)) {
-    Write-Step "Creating virtual environment…"
-    & $PythonCmd -m venv $VenvDir
-    Write-OK "Virtual environment created at .venv"
-} else {
-    Write-OK "Virtual environment exists"
-}
-
+# ── Virtual environment ───────────────────────────────────────
+$VenvDir    = Join-Path $ScriptDir '.venv'
 $PythonVenv = Join-Path $VenvDir 'Scripts\python.exe'
 $PipVenv    = Join-Path $VenvDir 'Scripts\pip.exe'
 
-if (-not (Test-Path $PythonVenv)) {
-    Write-Err "venv Python not found. Try deleting .venv and re-running."
-    exit 1
+if (-not (Test-Path $VenvDir)) {
+    Write-Host "  Creating virtual environment..." -ForegroundColor Cyan
+    & $PythonCmd -m venv $VenvDir
+    Write-Host "  Done" -ForegroundColor Green
 }
 
-# ── Install / update dependencies ───────────────────────────────────────────
-Write-Step "Installing/updating dependencies…"
-& $PipVenv install -q -r requirements.txt
-Write-OK "Dependencies ready"
+# ── Dependencies (skip if requirements unchanged) ────────────
+$ReqFile  = Join-Path $ScriptDir 'requirements.txt'
+$Sentinel = Join-Path $VenvDir '.deps-ok'
+$ReqHash  = (Get-FileHash $ReqFile -Algorithm MD5).Hash
+$NeedInstall = (-not (Test-Path $Sentinel)) -or ((Get-Content $Sentinel -Raw).Trim() -ne $ReqHash)
 
-# ── Ensure .env exists ──────────────────────────────────────────────────────
-if (-not (Test-Path (Join-Path $ScriptDir '.env'))) {
-    Write-Warn ".env not found — copying from .env.example"
-    Copy-Item (Join-Path $ScriptDir '.env.example') (Join-Path $ScriptDir '.env')
-    Write-OK ".env created. Edit it to add your API keys."
+if ($NeedInstall) {
+    Write-Host "  Installing dependencies..." -ForegroundColor Cyan
+    & $PipVenv install -q -r $ReqFile
+    $ReqHash | Set-Content $Sentinel
+    Write-Host "  Dependencies ready" -ForegroundColor Green
 }
 
-# ── Ensure data dir ─────────────────────────────────────────────────────────
-$DataDir = Join-Path $ScriptDir 'data'
-if (-not (Test-Path $DataDir)) {
-    New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-}
-
-# ── Read port ───────────────────────────────────────────────────────────────
-$Port = 7860
+# ── .env & data dir ──────────────────────────────────────────
 $EnvFile = Join-Path $ScriptDir '.env'
-if (Test-Path $EnvFile) {
-    $EnvContent = Get-Content $EnvFile
-    foreach ($line in $EnvContent) {
-        if ($line -match '^APP_PORT\s*=\s*(\d+)') {
-            $Port = [int]$Matches[1]
-        }
-    }
+if (-not (Test-Path $EnvFile)) { Copy-Item (Join-Path $ScriptDir '.env.example') $EnvFile }
+New-Item -ItemType Directory -Force -Path (Join-Path $ScriptDir 'data') | Out-Null
+
+# ── Port ─────────────────────────────────────────────────────
+$Port = 7860
+foreach ($line in (Get-Content $EnvFile -ErrorAction SilentlyContinue)) {
+    if ($line -match '^APP_PORT\s*=\s*(\d+)') { $Port = [int]$Matches[1] }
+}
+$Url = "http://localhost:$Port"
+
+# ── Start uvicorn as a background process ────────────────────
+Write-Host "  Starting server..." -ForegroundColor Cyan
+
+$proc = Start-Process `
+    -FilePath $PythonVenv `
+    -ArgumentList "-m", "uvicorn", "app:app", "--host", "0.0.0.0", "--port", "$Port", "--reload" `
+    -PassThru -NoNewWindow
+
+# ── Poll until ready, then print URL and open browser ────────
+$ready = $false
+for ($i = 0; $i -lt 40; $i++) {
+    Start-Sleep -Milliseconds 500
+    try {
+        $r = Invoke-WebRequest -Uri "$Url/health" -UseBasicParsing -TimeoutSec 1 -ErrorAction Stop
+        if ($r.StatusCode -eq 200) { $ready = $true; break }
+    } catch {}
 }
 
-$Url = "http://localhost:$Port"
-Write-Host ""
-Write-Host "  🚀  Starting Glyndwr on $Url" -ForegroundColor Magenta
-Write-Host "  📖  Press Ctrl+C to stop" -ForegroundColor DarkGray
-Write-Host ""
+if ($ready) {
+    Write-Host ""
+    Write-Host "  Application live at: $Url" -ForegroundColor Green
+    Write-Host "  Press Ctrl+C to stop" -ForegroundColor DarkGray
+    Write-Host ""
+    Start-Process $Url
+} else {
+    Write-Host "  Server did not respond after 20s -- check for errors above." -ForegroundColor Red
+}
 
-# ── Open browser after short delay ──────────────────────────────────────────
-$openBrowser = Start-Job -ScriptBlock {
-    param($url)
-    Start-Sleep -Seconds 2
-    Start-Process $url
-} -ArgumentList $Url
-
-# ── Run server ──────────────────────────────────────────────────────────────
+# ── Keep window open and forward Ctrl+C to uvicorn ───────────
 try {
-    & $PythonVenv -m uvicorn app:app --host 0.0.0.0 --port $Port --reload
+    $proc.WaitForExit()
 } finally {
-    Stop-Job $openBrowser -ErrorAction SilentlyContinue
-    Remove-Job $openBrowser -ErrorAction SilentlyContinue
+    if (-not $proc.HasExited) { $proc.Kill() }
 }

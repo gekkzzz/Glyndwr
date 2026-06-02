@@ -36,7 +36,7 @@ def _get_token(request: Request) -> Optional[str]:
 @router.get("/status")
 async def auth_status():
     count = await get_user_count()
-    return {"users_exist": count > 0, "needs_setup": count == 0}
+    return {"users_exist": count > 0}
 
 
 @router.post("/login")

@@ -36,18 +36,29 @@ const state = {
   pushSubscription: null,
 };
 
+// ─── Auth helpers ─────────────────────────────────────────────────────────────
+function getAuthToken() { return localStorage.getItem('glyndwr_token') || ''; }
+function getAuthHeaders() {
+  const t = getAuthToken();
+  return t ? { 'Authorization': `Bearer ${t}` } : {};
+}
+
 // ─── API ──────────────────────────────────────────────────────────────────────
 const API = {
   async get(path) {
-    const r = await fetch(path);
+    const r = await fetch(path, { headers: { ...getAuthHeaders() }, credentials: 'include' });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) throw new Error(`GET ${path} → ${r.status}`);
     return r.json();
   },
   async post(path, body) {
     const r = await fetch(path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) {
       const err = await r.json().catch(() => ({ detail: r.statusText }));
       throw new Error(err.detail || `POST ${path} → ${r.status}`);
@@ -56,9 +67,12 @@ const API = {
   },
   async put(path, body) {
     const r = await fetch(path, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) {
       const err = await r.json().catch(() => ({ detail: r.statusText }));
       throw new Error(err.detail || `PUT ${path} → ${r.status}`);
@@ -66,15 +80,19 @@ const API = {
     return r.json();
   },
   async del(path) {
-    const r = await fetch(path, { method: 'DELETE' });
+    const r = await fetch(path, { method: 'DELETE', headers: { ...getAuthHeaders() }, credentials: 'include' });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) throw new Error(`DELETE ${path} → ${r.status}`);
     return r.json();
   },
   async streamPost(path, body) {
     const r = await fetch(path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      credentials: 'include',
       body: JSON.stringify(body),
     });
+    if (r.status === 401) { redirectToLogin(); throw new Error('Unauthorized'); }
     if (!r.ok) {
       const err = await r.json().catch(() => ({ detail: r.statusText }));
       throw new Error(err.detail || `POST ${path} → ${r.status}`);
@@ -82,6 +100,12 @@ const API = {
     return r;
   },
 };
+
+function redirectToLogin() {
+  localStorage.removeItem('glyndwr_token');
+  localStorage.removeItem('glyndwr_user');
+  window.location.href = '/login';
+}
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 function showToast(message, type = 'info', duration = 3500) {
@@ -178,9 +202,11 @@ function switchSection(name) {
     case 'documents': loadDocuments(); break;
     case 'email':    renderEmailSection(); break;
     case 'calendar': loadCalendarEvents(); break;
-    case 'memory':   renderMemory(); break;
+    case 'memory':   loadMemories(); break;
     case 'cookbook': renderCookbook(); break;
+    case 'gallery':  if (typeof ImageEditor !== 'undefined') ImageEditor.loadGalleryList(); break;
   }
+  if (typeof syncToolsCollapse === 'function') syncToolsCollapse(name);
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
@@ -242,9 +268,11 @@ function getProviderIcon(model) {
   const m = model.toLowerCase();
   if (m.startsWith('gpt') || m.startsWith('o1') || m.startsWith('o3')) return '<span class="model-tag">OAI</span>';
   if (m.startsWith('claude')) return '<span class="model-tag">ANT</span>';
-  if (m.startsWith('llama') || m.startsWith('mixtral') || m.startsWith('gemma')) return '<span class="model-tag">GRQ</span>';
   if (m.startsWith('gemini')) return '<span class="model-tag">GEM</span>';
   if (m.startsWith('deepseek')) return '<span class="model-tag">DSK</span>';
+  // Groq only for models with Groq-specific naming (versatile, instant, 32768)
+  if (/versatile|instant|32768|specdec/.test(m)) return '<span class="model-tag">GRQ</span>';
+  // Everything else (llama3.2, mistral, gemma, phi, qwen…) is a local Ollama model
   return '<span class="model-tag">LLM</span>';
 }
 
@@ -449,6 +477,8 @@ async function sendMessage() {
         await loadConversations();
       } catch {}
     } else { await loadConversations(); }
+    // Auto-extract memories after conversation (background, non-blocking)
+    if (state.currentConversationId) extractMemoriesFromConversation(state.currentConversationId);
   } catch (e) {
     typingEl.remove();
     showToast(`Error: ${e.message}`, 'error');
@@ -554,14 +584,15 @@ function updateProviderStatus() {
 }
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
-const THEMES = ['dragon', 'annwn', 'eryri', 'mabinogi', 'coed', 'mor'];
+const THEMES = ['dragon','annwn','eryri','mabinogi','coed','mor','midnight','cyberpunk','retrowave','forest','ocean','terminal','amber','light','custom'];
 function applyTheme(theme) {
-  if (!THEMES.includes(theme)) theme = 'dragon';
   const body = document.body;
   THEMES.forEach(t => body.classList.remove(`theme-${t}`));
   body.classList.add(`theme-${theme}`);
   state.currentTheme = theme;
   document.querySelectorAll('.theme-swatch').forEach(s => s.classList.toggle('active', s.dataset.theme === theme));
+  // Persist
+  saveSettingLocal('theme', theme).catch(() => {});
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
@@ -590,6 +621,9 @@ async function loadSettings() {
       if (picker) picker.value = state.settings['accent_color'];
     }
     applyBgPattern(state.settings['bg_pattern'] || 'none');
+    // Font + density (applied again in initAnimatedBackground but set early)
+    if (state.settings['font_family']) applyFont(state.settings['font_family']);
+    if (state.settings['density']) { document.body.classList.remove('density-compact','density-spacious'); if (state.settings['density']) document.body.classList.add(state.settings['density']); }
 
     // Email settings
     const emailKeys = ['email_imap_host','email_imap_port','email_imap_username','email_imap_password','email_smtp_host','email_smtp_port','email_smtp_username','email_smtp_password'];
@@ -621,22 +655,39 @@ function applyBgPattern(pattern) {
 }
 
 async function saveSettings() {
+  // Core settings
   const payload = {
     theme: state.currentTheme,
-    default_model: document.getElementById('setting-default-model').value,
-    default_system_prompt: document.getElementById('setting-system-prompt').value,
-    history_limit: document.getElementById('setting-history-limit').value,
-    auto_rename: document.getElementById('setting-auto-rename').value,
-    font_size: document.getElementById('setting-font-size').value,
-    compact: document.getElementById('setting-compact').value,
+    default_model: document.getElementById('setting-default-model')?.value || '',
+    default_system_prompt: document.getElementById('setting-system-prompt')?.value || '',
+    history_limit: document.getElementById('setting-history-limit')?.value || '20',
+    auto_rename: document.getElementById('setting-auto-rename')?.value || 'true',
+    font_size: document.getElementById('setting-font-size')?.value || 'md',
   };
+
+  // Provider API keys — save to DB so no .env needed
+  const providerFields = {
+    openai_api_key: 'key-openai',
+    anthropic_api_key: 'key-anthropic',
+    groq_api_key: 'key-groq',
+    gemini_api_key: 'key-gemini',
+    deepseek_api_key: 'key-deepseek',
+    openrouter_api_key: 'key-openrouter',
+    ollama_host: 'key-ollama',
+  };
+  for (const [settingKey, elId] of Object.entries(providerFields)) {
+    const el = document.getElementById(elId);
+    if (el && el.value.trim()) payload[settingKey] = el.value.trim();
+  }
+
   try {
     await API.put('/api/settings/', payload);
     state.settings = { ...state.settings, ...payload };
     applyFontSize(payload.font_size);
-    document.body.classList.toggle('compact', payload.compact === 'true');
     showToast('Settings saved', 'success');
     closeModal('settings-overlay');
+    // Reload model list so new provider keys take effect immediately
+    await loadModels();
   } catch (e) { showToast(`Failed to save settings: ${e.message}`, 'error'); }
 }
 
@@ -1464,28 +1515,114 @@ async function syncCalDAV() {
 // ═══════════════════════════════════════════════════════════
 //  MEMORY
 // ═══════════════════════════════════════════════════════════
-function renderMemory() {
+let _memoryCategoryFilter = '';
+
+async function loadMemories() {
   const list = document.getElementById('memory-list');
+  if (!list) return;
+  const search = document.getElementById('memory-search')?.value || '';
+  let url = '/api/memories/';
+  if (search) url += `?search=${encodeURIComponent(search)}`;
+  try {
+    const items = await API.get(url);
+    renderMemoryList(items);
+  } catch (e) { list.innerHTML = `<div style="padding:20px;color:var(--text-faint);text-align:center">Failed to load: ${escHtml(e.message)}</div>`; }
+}
+
+function renderMemoryList(items) {
+  const list = document.getElementById('memory-list');
+  if (!list) return;
+  let filtered = items;
+  if (_memoryCategoryFilter) filtered = items.filter(m => m.category === _memoryCategoryFilter);
+  if (!filtered.length) {
+    list.innerHTML = '<div style="padding:24px;font-size:13px;color:var(--text-faint);text-align:center">No memories yet.<br>Memories are extracted automatically when you chat,<br>or add one manually with the + button.</div>';
+    return;
+  }
   list.innerHTML = '';
-  const filter = (state.memoryFilter || '').toLowerCase();
-  let convs = state.conversations.filter(c => c.message_count > 0);
-  if (filter) convs = convs.filter(c => c.title.toLowerCase().includes(filter) || (c.last_message || '').toLowerCase().includes(filter));
-  if (!convs.length) { list.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--text-faint);text-align:center">No conversation memories found.</div>'; return; }
-  for (const conv of convs) {
-    const card = document.createElement('div'); card.className = 'memory-card';
-    card.innerHTML = `<div class="memory-card-title">${escHtml(conv.title)}</div><div class="memory-card-preview">${escHtml((conv.last_message || '').slice(0, 160))}</div><div class="memory-card-meta"><span>${formatDate(conv.updated_at)}</span><span>${conv.message_count} message${conv.message_count !== 1 ? 's' : ''}</span></div>`;
-    card.addEventListener('click', () => { switchSection('chat'); openConversation(conv.id); });
+  for (const mem of filtered) {
+    const card = document.createElement('div');
+    card.className = 'memory-card';
+    const confPct = Math.min(100, mem.confidence || 100);
+    const sourceLabel = mem.source && mem.source !== 'manual'
+      ? `<span class="memory-source">from conversation</span>` : '';
+    card.innerHTML = `
+      <div class="memory-card-title">${escHtml(mem.title)}</div>
+      <div class="memory-card-preview">${escHtml(mem.content)}</div>
+      <div class="memory-card-meta">
+        <span class="memory-category-badge">${escHtml(mem.category || 'general')}</span>
+        <span class="memory-confidence">
+          <div class="memory-conf-bar"><div class="memory-conf-fill" style="width:${confPct}%"></div></div>
+          <span style="font-size:10px;color:var(--text-faint)">${confPct}%</span>
+        </span>
+        ${sourceLabel}
+        <div class="memory-card-actions">
+          <button class="memory-action-btn" onclick="openEditMemory('${escHtml(mem.id)}','${escHtml(mem.title.replace(/'/g,"\\x27"))}','${escHtml(mem.content.replace(/'/g,"\\x27"))}','${escHtml(mem.category || 'general')}')">Edit</button>
+          <button class="memory-action-btn danger" onclick="deleteMemory('${escHtml(mem.id)}')">Delete</button>
+        </div>
+      </div>`;
     list.appendChild(card);
   }
 }
 
-async function clearAllMemories() {
-  if (!confirm('Delete ALL conversations?')) return;
+window.openEditMemory = function(id, title, content, category) {
+  document.getElementById('edit-mem-id').value = id;
+  document.getElementById('edit-mem-title').value = title;
+  document.getElementById('edit-mem-content').value = content;
+  document.getElementById('edit-mem-category').value = category;
+  openModal('edit-memory-overlay');
+};
+
+async function saveEditMemory() {
+  const id = document.getElementById('edit-mem-id').value;
+  const title = document.getElementById('edit-mem-title').value.trim();
+  const content = document.getElementById('edit-mem-content').value.trim();
+  const category = document.getElementById('edit-mem-category').value;
+  if (!title || !content) { showToast('Title and content required', 'warning'); return; }
   try {
-    for (const conv of [...state.conversations]) await API.del(`/api/chat/${conv.id}`);
-    state.conversations = []; state.currentConversationId = null; state.messages = [];
-    renderSidebar(); renderMemory(); showToast('All conversations deleted', 'success');
-  } catch (e) { showToast(`Failed: ${e.message}`, 'error'); }
+    await API.put(`/api/memories/${id}`, { title, content, category });
+    closeModal('edit-memory-overlay');
+    await loadMemories();
+    showToast('Memory updated', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// Auto-extract memories from a completed conversation
+async function extractMemoriesFromConversation(convId) {
+  if (!convId || !state.settings['memory_auto_extract']) return;
+  const model = state.settings['default_model'] || state.currentModel || 'gpt-4o-mini';
+  try {
+    const result = await API.post('/api/memories/extract', { conversation_id: convId, model });
+    if (result.extracted > 0) {
+      showToast(`${result.extracted} memory${result.extracted > 1 ? 's' : ''} saved from conversation`, 'success', 4000);
+    }
+  } catch { /* Silent fail — memory extraction is best-effort */ }
+}
+
+window.deleteMemory = async function(id) {
+  if (!confirm('Delete this memory?')) return;
+  try { await API.del(`/api/memories/${id}`); await loadMemories(); showToast('Memory deleted', 'success'); }
+  catch (e) { showToast(e.message, 'error'); }
+};
+
+async function clearAllMemories() {
+  if (!confirm('Clear all memories? This cannot be undone.')) return;
+  try { await API.del('/api/memories/all'); await loadMemories(); showToast('Memories cleared', 'success'); }
+  catch (e) { showToast(e.message, 'error'); }
+}
+
+async function saveMemory() {
+  const title = document.getElementById('mem-title')?.value.trim();
+  const content = document.getElementById('mem-content')?.value.trim();
+  const category = document.getElementById('mem-category')?.value || 'general';
+  if (!title || !content) { showToast('Title and content required', 'warning'); return; }
+  try {
+    await API.post('/api/memories/', { title, content, category, confidence: 100, source: 'manual' });
+    closeModal('add-memory-overlay');
+    document.getElementById('mem-title').value = '';
+    document.getElementById('mem-content').value = '';
+    await loadMemories();
+    showToast('Memory saved', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1564,6 +1701,14 @@ async function runAgent() {
 // ═══════════════════════════════════════════════════════════
 //  DEEP RESEARCH
 // ═══════════════════════════════════════════════════════════
+function _setPipelineStep(step, state) {
+  const el = document.getElementById(`pipe-${step}`);
+  if (!el) return;
+  el.classList.remove('active', 'done');
+  if (state === 'active') el.classList.add('active');
+  if (state === 'done') el.classList.add('done');
+}
+
 async function runResearch() {
   const question = document.getElementById('research-input').value.trim();
   if (!question) return;
@@ -1571,39 +1716,57 @@ async function runResearch() {
   const numQueries = parseInt(document.getElementById('research-depth').value || '3', 10);
 
   document.getElementById('research-input').value = '';
-  document.getElementById('research-status-bar').style.display = 'flex';
+  document.getElementById('research-pipeline').style.display = 'flex';
   document.getElementById('research-sources').style.display = 'none';
   document.getElementById('research-sources-list').innerHTML = '';
   document.getElementById('research-report').innerHTML = '';
   document.getElementById('research-btn').disabled = true;
+  ['queries','search','read','synthesise'].forEach(s => _setPipelineStep(s, ''));
+  _setPipelineStep('queries', 'active');
 
   let reportHtml = '';
 
   try {
     const resp = await fetch('/api/research/run', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ question, model, num_queries: numQueries }),
     });
-    if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.detail || `Research error ${resp.status}`); }
-    const reader = resp.body.getReader(); const decoder = new TextDecoder(); let buffer = '';
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `Research error ${resp.status}`);
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
     while (true) {
-      const { done, value } = await reader.read(); if (done) break;
+      const { done, value } = await reader.read();
+      if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n'); buffer = lines.pop();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         try {
           const event = JSON.parse(line.slice(6));
           if (event.type === 'status') {
-            document.getElementById('research-status-text').textContent = event.data;
+            const t = (event.data || '').toLowerCase();
+            if (t.includes('quer')) { _setPipelineStep('queries', 'active'); }
+            else if (t.includes('search')) { _setPipelineStep('queries', 'done'); _setPipelineStep('search', 'active'); }
+            else if (t.includes('read') || t.includes('fetch')) { _setPipelineStep('search', 'done'); _setPipelineStep('read', 'active'); }
+            else if (t.includes('synth') || t.includes('writ')) { _setPipelineStep('read', 'done'); _setPipelineStep('synthesise', 'active'); }
           } else if (event.type === 'queries') {
-            const qs = event.data;
-            document.getElementById('research-status-text').textContent = `Searching ${qs.length} queries…`;
+            _setPipelineStep('queries', 'done');
+            _setPipelineStep('search', 'active');
           } else if (event.type === 'sources') {
+            _setPipelineStep('search', 'done');
+            _setPipelineStep('read', 'done');
+            _setPipelineStep('synthesise', 'active');
             const sources = event.data;
             document.getElementById('research-sources').style.display = 'block';
             document.getElementById('research-sources-list').innerHTML = sources.map(s =>
-              `<div class="research-source"><a href="${escHtml(s.url)}" target="_blank">${escHtml(s.title || s.url)}</a></div>`
+              `<div class="research-source"><a href="${escHtml(s.url)}" target="_blank" rel="noopener">${escHtml(s.title || s.url)}</a></div>`
             ).join('');
           } else if (event.type === 'chunk') {
             reportHtml += event.data;
@@ -1614,9 +1777,11 @@ async function runResearch() {
         } catch {}
       }
     }
-  } catch (e) { showToast(`Research failed: ${e.message}`, 'error'); }
+    _setPipelineStep('synthesise', 'done');
+  } catch (e) {
+    showToast(`Research failed: ${e.message}`, 'error');
+  }
 
-  document.getElementById('research-status-bar').style.display = 'none';
   document.getElementById('research-btn').disabled = false;
 }
 
@@ -1627,79 +1792,148 @@ function renderCookbook() {
   renderCookbookModels();
 }
 
+// ── Forge hardware state ───────────────────────────────────
+const _hwState = { vramGB: null, ramGB: null };
+
 function scanHardware() {
   const info = {};
-  info.ram = navigator.deviceMemory ? `${navigator.deviceMemory} GB (reported)` : 'Unknown';
-  info.cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} logical cores` : 'Unknown';
-  info.platform = navigator.platform || 'Unknown';
+  info.ram = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : 'Unknown';
+  info.cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} cores` : 'Unknown';
+  info.platform = navigator.platform || navigator.userAgentData?.platform || 'Unknown';
   info.mobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // Try to estimate VRAM via WebGL
-  let vram = 'Unknown';
+  let vramGB = null;
   try {
     const canvas = document.createElement('canvas');
     const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
     if (gl) {
       const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
       if (dbgInfo) {
-        const renderer = gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL) || '';
-        info.gpu = renderer;
-        const vramMatch = renderer.match(/(\d+)\s*GB/i);
-        if (vramMatch) vram = `~${vramMatch[1]} GB (from GPU name)`;
+        info.gpu = gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL) || '';
+        const m = info.gpu.match(/(\d+)\s*GB/i);
+        if (m) { vramGB = parseInt(m[1]); info.vram = `~${vramGB} GB`; }
+        else info.vram = 'Unknown (check GPU specs)';
       }
     }
-  } catch {}
-  info.vram = vram;
+  } catch { info.vram = 'Unknown'; }
+
+  if (navigator.deviceMemory) _hwState.ramGB = navigator.deviceMemory;
+  if (vramGB) _hwState.vramGB = vramGB;
 
   const el = document.getElementById('hardware-info');
   el.style.display = 'block';
   el.innerHTML = `
     <div class="hardware-grid">
+      <div class="hw-item"><div class="hw-label">GPU</div><div class="hw-val">${escHtml(info.gpu || 'Unknown')}</div></div>
+      <div class="hw-item"><div class="hw-label">VRAM</div><div class="hw-val">${escHtml(info.vram || 'Unknown')}</div></div>
       <div class="hw-item"><div class="hw-label">RAM</div><div class="hw-val">${escHtml(info.ram)}</div></div>
-      <div class="hw-item"><div class="hw-label">CPU Cores</div><div class="hw-val">${escHtml(info.cores)}</div></div>
-      <div class="hw-item"><div class="hw-label">GPU / VRAM</div><div class="hw-val">${escHtml(info.gpu || 'N/A')} · ${escHtml(info.vram)}</div></div>
-      <div class="hw-item"><div class="hw-label">Platform</div><div class="hw-val">${escHtml(info.platform)} ${info.mobile ? '(mobile)' : '(desktop)'}</div></div>
+      <div class="hw-item"><div class="hw-label">CPU</div><div class="hw-val">${escHtml(info.cores)} · ${escHtml(info.platform)}</div></div>
     </div>
-    <p class="form-hint" style="margin-top:12px">Note: Browser hardware APIs give approximate values only. For accurate VRAM, check your GPU specs.</p>`;
+    <p class="form-hint" style="margin-top:10px">Browser APIs give approximate values. Use <strong>Enter manually</strong> if VRAM is wrong.</p>`;
 
-  renderCookbookModels(info);
+  renderCookbookModels();
 }
 
-function renderCookbookModels(hw) {
-  const models = [
-    { name: 'Llama 3.2 1B', size: '~0.8 GB', vram: '<2 GB', ram: '4 GB', tier: 'any', tags: ['fast', 'small', 'chat'], desc: 'Tiny model, runs on almost any hardware including phones. Great for quick tasks.' },
-    { name: 'Llama 3.2 3B', size: '~2 GB', vram: '<4 GB', ram: '8 GB', tier: 'low', tags: ['fast', 'balanced', 'chat'], desc: 'Small but capable. Runs well on integrated graphics or CPU.' },
-    { name: 'Llama 3.1 8B', size: '~5 GB', vram: '6-8 GB', ram: '16 GB', tier: 'mid', tags: ['balanced', 'code', 'reasoning'], desc: 'The sweet spot for most tasks. Needs a modern GPU with 8 GB+ VRAM or fast CPU.' },
-    { name: 'Mistral 7B', size: '~4.5 GB', vram: '6-8 GB', ram: '16 GB', tier: 'mid', tags: ['balanced', 'fast', 'chat'], desc: 'Very capable 7B model. Excellent instruction following and speed.' },
-    { name: 'Qwen 2.5 14B', size: '~9 GB', vram: '12-16 GB', ram: '24 GB', tier: 'high', tags: ['reasoning', 'code', 'multilingual'], desc: 'Strong multilingual model. Great for coding and complex reasoning.' },
-    { name: 'Llama 3.3 70B', size: '~40 GB', vram: '40-48 GB', ram: '64 GB', tier: 'pro', tags: ['frontier', 'reasoning', 'code', 'long-context'], desc: 'Near-frontier performance. Needs a high-end workstation with dual GPUs or 48 GB+ VRAM.' },
-    { name: 'DeepSeek-R1 32B', size: '~20 GB', vram: '20-24 GB', ram: '32 GB', tier: 'high', tags: ['reasoning', 'math', 'code'], desc: 'Excellent reasoning model rivaling GPT-4o on benchmarks. Needs 24 GB VRAM.' },
-    { name: 'Gemma 2 9B', size: '~6 GB', vram: '8-12 GB', ram: '16 GB', tier: 'mid', tags: ['balanced', 'safe', 'fast'], desc: "Google's compact but strong model. Good safety alignment." },
-    { name: 'Phi-4 Mini', size: '~2.5 GB', vram: '<4 GB', ram: '8 GB', tier: 'low', tags: ['reasoning', 'small', 'code'], desc: "Microsoft's tiny but surprisingly capable reasoning model." },
-    { name: 'Gemma 3 27B', size: '~17 GB', vram: '16-20 GB', ram: '32 GB', tier: 'high', tags: ['balanced', 'vision', 'long-context'], desc: 'Strong multimodal model with vision support.' },
-  ];
+function applyManualHardware() {
+  const gpu = document.getElementById('hw-gpu')?.value.trim();
+  const vram = parseFloat(document.getElementById('hw-vram')?.value);
+  const ram = parseFloat(document.getElementById('hw-ram')?.value);
+  const cpu = document.getElementById('hw-cpu')?.value.trim();
 
-  const tierColors = { any: 'var(--text-muted)', low: '#4a9038', mid: '#2a8ab8', high: '#7055dd', pro: '#cc2800' };
-  const tierLabels = { any: 'Any hardware', low: 'Low-end GPU', mid: 'Mid-range GPU', high: 'High-end GPU', pro: 'Workstation' };
+  if (vram) _hwState.vramGB = vram;
+  if (ram) _hwState.ramGB = ram;
 
+  const el = document.getElementById('hardware-info');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="hardware-grid">
+      <div class="hw-item"><div class="hw-label">GPU</div><div class="hw-val">${escHtml(gpu || 'Not specified')}</div></div>
+      <div class="hw-item"><div class="hw-label">VRAM</div><div class="hw-val">${vram ? vram + ' GB' : 'Not specified'}</div></div>
+      <div class="hw-item"><div class="hw-label">RAM</div><div class="hw-val">${ram ? ram + ' GB' : 'Not specified'}</div></div>
+      <div class="hw-item"><div class="hw-label">CPU</div><div class="hw-val">${escHtml(cpu || 'Not specified')}</div></div>
+    </div>`;
+
+  document.getElementById('manual-hw-form').style.display = 'none';
+  renderCookbookModels();
+  showToast('Hardware updated', 'success');
+}
+
+// ── Model database (from llmfit patterns) ─────────────────
+const FORGE_MODELS = [
+  { name: 'Llama 3.2 1B',     ollama: 'llama3.2:1b',      size: 0.8,  vram: 2,  ram: 4,  tier: 'any',  tags: ['fast','tiny','chat'],           desc: 'Runs on virtually any device including phones. Great for quick tasks and testing.' },
+  { name: 'Phi-4 Mini',       ollama: 'phi4-mini',         size: 2.5,  vram: 3,  ram: 8,  tier: 'any',  tags: ['reasoning','tiny','code'],       desc: "Microsoft's tiny but surprisingly capable reasoning model." },
+  { name: 'Llama 3.2 3B',     ollama: 'llama3.2:3b',       size: 2,    vram: 4,  ram: 8,  tier: 'low',  tags: ['fast','balanced','chat'],        desc: 'Small but capable. Runs on integrated graphics or CPU.' },
+  { name: 'Gemma 3 4B',       ollama: 'gemma3:4b',         size: 3,    vram: 4,  ram: 8,  tier: 'low',  tags: ['balanced','fast','multimodal'],  desc: "Google's latest small model with vision support." },
+  { name: 'Mistral 7B',       ollama: 'mistral',           size: 4.5,  vram: 6,  ram: 16, tier: 'mid',  tags: ['balanced','fast','chat'],        desc: 'Excellent instruction following and speed. A solid all-rounder.' },
+  { name: 'Llama 3.1 8B',     ollama: 'llama3.1:8b',       size: 5,    vram: 8,  ram: 16, tier: 'mid',  tags: ['balanced','code','reasoning'],   desc: 'Sweet spot for most tasks. Needs 8 GB+ VRAM or a fast CPU.' },
+  { name: 'Gemma 2 9B',       ollama: 'gemma2:9b',         size: 6,    vram: 10, ram: 16, tier: 'mid',  tags: ['balanced','safe','fast'],        desc: "Google's compact but strong model with good safety alignment." },
+  { name: 'Llama 3.1 70B Q4', ollama: 'llama3.1:70b-q4',  size: 40,   vram: 24, ram: 48, tier: 'high', tags: ['frontier','reasoning','code'],   desc: 'Near-frontier quality at 4-bit quantisation. Requires a high-end GPU.' },
+  { name: 'Qwen 2.5 14B',     ollama: 'qwen2.5:14b',       size: 9,    vram: 12, ram: 24, tier: 'high', tags: ['reasoning','code','multilingual'],'desc': 'Strong multilingual model. Great for coding and complex reasoning.' },
+  { name: 'DeepSeek-R1 7B',   ollama: 'deepseek-r1:7b',    size: 5,    vram: 8,  ram: 16, tier: 'mid',  tags: ['reasoning','math','code'],       desc: 'Thinking model with chain-of-thought. Good reasoning at 7B scale.' },
+  { name: 'DeepSeek-R1 32B',  ollama: 'deepseek-r1:32b',   size: 20,   vram: 24, ram: 32, tier: 'high', tags: ['reasoning','math','code'],       desc: 'Strong reasoning model. Rivals GPT-4o on benchmarks. Needs 24 GB VRAM.' },
+  { name: 'Gemma 3 27B',      ollama: 'gemma3:27b',        size: 17,   vram: 20, ram: 32, tier: 'high', tags: ['balanced','vision','long-ctx'],  desc: 'Strong multimodal model with vision support and long context.' },
+  { name: 'Llama 3.3 70B',    ollama: 'llama3.3:70b',      size: 40,   vram: 48, ram: 64, tier: 'pro',  tags: ['frontier','reasoning','code'],   desc: 'Near-frontier performance. Needs dual GPUs or 48 GB+ VRAM.' },
+  { name: 'Qwen 2.5 72B',     ollama: 'qwen2.5:72b',       size: 45,   vram: 48, ram: 64, tier: 'pro',  tags: ['reasoning','multilingual','code'],'desc': 'One of the strongest open models. Requires workstation hardware.' },
+];
+
+const TIER_LABELS = { any: 'Any hardware', low: 'Low-end', mid: 'Mid-range', high: 'High-end', pro: 'Workstation' };
+const TIER_COLORS = { any: 'var(--success)', low: '#4a9038', mid: '#2a8ab8', high: '#7055dd', pro: 'var(--red)' };
+
+let _forgeTierFilter = '';
+let _forgeSearch = '';
+
+function _modelFits(m) {
+  if (!_hwState.vramGB) return true; // no hardware info → show all
+  return m.vram <= _hwState.vramGB;
+}
+
+function renderCookbookModels() {
   const el = document.getElementById('cookbook-model-list');
-  el.innerHTML = models.map(m => `
-    <div class="cookbook-model-card">
+  if (!el) return;
+
+  let models = FORGE_MODELS;
+  if (_forgeTierFilter) models = models.filter(m => m.tier === _forgeTierFilter);
+  if (_forgeSearch) {
+    const q = _forgeSearch.toLowerCase();
+    models = models.filter(m =>
+      m.name.toLowerCase().includes(q) ||
+      m.tags.some(t => t.includes(q)) ||
+      m.desc.toLowerCase().includes(q)
+    );
+  }
+
+  if (!models.length) {
+    el.innerHTML = '<div style="grid-column:1/-1;padding:20px;color:var(--text-faint);text-align:center">No models match your filter.</div>';
+    return;
+  }
+
+  el.innerHTML = models.map(m => {
+    const fits = _modelFits(m);
+    const fitClass = fits ? 'recommended' : '';
+    const fitBadge = _hwState.vramGB
+      ? (fits
+        ? `<span class="hw-fit-badge hw-fit-good">Fits your GPU</span>`
+        : `<span class="hw-fit-badge hw-fit-tight">Needs ${m.vram} GB VRAM</span>`)
+      : '';
+    return `
+    <div class="cookbook-model-card ${fitClass}">
       <div class="cookbook-model-header">
-        <div class="cookbook-model-name">${escHtml(m.name)}</div>
-        <span class="due-badge" style="background:${tierColors[m.tier]};color:white">${tierLabels[m.tier]}</span>
+        <div>
+          <div class="cookbook-model-name">${escHtml(m.name)}</div>
+          ${fitBadge}
+        </div>
+        <span class="hw-fit-badge" style="background:color-mix(in srgb,${TIER_COLORS[m.tier]} 15%,transparent);color:${TIER_COLORS[m.tier]};border:1px solid ${TIER_COLORS[m.tier]}">${TIER_LABELS[m.tier]}</span>
       </div>
       <div class="cookbook-model-desc">${escHtml(m.desc)}</div>
       <div class="cookbook-model-specs">
-        <span><strong>Size:</strong> ${escHtml(m.size)}</span>
-        <span><strong>VRAM:</strong> ${escHtml(m.vram)}</span>
-        <span><strong>RAM:</strong> ${escHtml(m.ram)}</span>
+        <span><strong>Size:</strong> ${m.size} GB</span>
+        <span><strong>VRAM:</strong> ${m.vram} GB+</span>
+        <span><strong>RAM:</strong> ${m.ram} GB+</span>
       </div>
-      <div class="cookbook-model-tags">${m.tags.map(t => `<span class="model-tag" style="font-size:10px">${t}</span>`).join('')}</div>
-      <div class="cookbook-model-action">
-        <code style="font-size:11px;color:var(--text-muted)">ollama pull ${m.name.toLowerCase().replace(/\s+/g, ':').replace(/[^a-z0-9:.]/g, '')}</code>
-      </div>
-    </div>`).join('');
+      <div class="cookbook-model-tags">${m.tags.map(t => `<span class="cookbook-model-tag">${t}</span>`).join('')}</div>
+      <div class="cookbook-model-action">ollama pull ${escHtml(m.ollama)}</div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1800,26 +2034,71 @@ async function checkServerHealth() {
   return false;
 }
 
+async function checkAuth() {
+  const token = getAuthToken();
+  if (!token) { redirectToLogin(); return false; }
+  try {
+    const r = await fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` },
+      credentials: 'include',
+    });
+    if (!r.ok) { redirectToLogin(); return false; }
+    const user = await r.json();
+    state.currentUser = user;
+    updateUserDisplay(user);
+    return true;
+  } catch { return false; }
+}
+
+function updateUserDisplay(user) {
+  if (!user) return;
+  const initial = (user.username || '?')[0].toUpperCase();
+  const avatar = document.getElementById('nav-user-avatar');
+  if (avatar) { avatar.textContent = initial; avatar.title = user.username; }
+  // Account tab
+  const accName = document.getElementById('account-username');
+  if (accName) accName.textContent = user.username;
+  const accAvatar = document.getElementById('account-avatar');
+  if (accAvatar) accAvatar.textContent = initial;
+  const roleBadge = document.getElementById('account-role-badge');
+  if (roleBadge) roleBadge.textContent = user.is_admin ? 'admin' : 'user';
+  // Show admin tab
+  if (user.is_admin) {
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.remove('hidden'));
+  }
+}
+
 async function init() {
   setupMarked();
   await setupPWA();
 
-  const serverOk = await checkServerHealth();
-  if (!serverOk) return; // show offline banner, stop loading
+  try {
+    const serverOk = await checkServerHealth();
+    if (!serverOk) return;
 
-  await loadSettings();
-  await loadModels();
-  await loadConversations();
+    const authed = await checkAuth();
+    if (!authed) return;
 
-  document.querySelectorAll('.modal').forEach(modal => initTabs(modal));
-  bindEvents();
+    await loadSettings();
+    await loadModels();
+    await loadConversations();
 
-  document.getElementById('app-spinner').style.display = 'none';
-  document.getElementById('message-input').disabled = true;
-  document.getElementById('send-btn').disabled = true;
-  document.getElementById('input-hint').classList.remove('hidden');
+    document.querySelectorAll('.modal').forEach(modal => initTabs(modal));
 
-  renderCookbookModels();
+    try { bindEvents(); } catch(e) { console.error('bindEvents error:', e); }
+    try { bindExtendedEvents(); } catch(e) { console.error('bindExtendedEvents error:', e); }
+
+    document.getElementById('message-input').disabled = true;
+    document.getElementById('send-btn').disabled = true;
+    document.getElementById('input-hint')?.classList.remove('hidden');
+
+    renderCookbookModels();
+    try { initAnimatedBackground(); } catch(e) { console.error('initAnimatedBackground error:', e); }
+  } finally {
+    // Always hide the spinner — even if something above crashed
+    const spinner = document.getElementById('app-spinner');
+    if (spinner) spinner.style.display = 'none';
+  }
 }
 
 function bindEvents() {
@@ -1828,43 +2107,40 @@ function bindEvents() {
     btn.addEventListener('click', () => switchSection(btn.dataset.section));
   });
 
-  // Tools flyout
-  const toolsBtn = document.getElementById('nav-tools-btn');
-  const toolsFlyout = document.getElementById('nav-tools-flyout');
-  toolsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toolsFlyout.classList.toggle('hidden');
-    toolsBtn.classList.toggle('tools-active', !toolsFlyout.classList.contains('hidden'));
-  });
-  document.querySelectorAll('.nav-flyout-item[data-section]').forEach(item => {
-    item.addEventListener('click', () => {
-      switchSection(item.dataset.section);
-      toolsFlyout.classList.add('hidden');
-      toolsBtn.classList.remove('tools-active');
-      // Highlight tools btn when a tool section is active
-      toolsBtn.classList.add('tools-active');
-    });
-  });
-  document.getElementById('flyout-compare-btn')?.addEventListener('click', () => {
-    state.compareHistory = { a: [], b: [] };
-    document.getElementById('compare-messages-a').innerHTML = '';
-    document.getElementById('compare-messages-b').innerHTML = '';
-    openModal('compare-overlay');
-    toolsFlyout.classList.add('hidden');
-    toolsBtn.classList.remove('tools-active');
-  });
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#nav-tools-wrapper')) {
-      toolsFlyout.classList.add('hidden');
-      const toolSections = ['agent','research','memory','cookbook'];
-      if (!toolSections.includes(state.currentSection)) {
-        toolsBtn.classList.remove('tools-active');
-      }
+  // Tools — collapsible inline section
+  const toolsToggle = document.getElementById('nav-tools-toggle');
+  const toolsCollapse = document.getElementById('nav-tools-collapse');
+  const TOOL_SECTIONS = new Set(['agent','research','memory','cookbook']);
+
+  function toggleToolsCollapse() {
+    const isOpen = toolsCollapse.classList.contains('open');
+    toolsCollapse.classList.toggle('open', !isOpen);
+    toolsToggle.classList.toggle('tools-open', !isOpen);
+  }
+
+  toolsToggle?.addEventListener('click', toggleToolsCollapse);
+
+  // Keep tools open when a tool section is active
+  function syncToolsCollapse(section) {
+    if (TOOL_SECTIONS.has(section)) {
+      toolsCollapse.classList.add('open');
+      toolsToggle.classList.add('tools-open');
     }
-  });
+  }
 
   document.getElementById('nav-settings-btn').addEventListener('click', () => {
     populateSettingsDefaultModel();
+    // Populate saved provider keys from DB settings
+    const providerFields = {
+      openai_api_key: 'key-openai', anthropic_api_key: 'key-anthropic',
+      groq_api_key: 'key-groq', gemini_api_key: 'key-gemini',
+      deepseek_api_key: 'key-deepseek', openrouter_api_key: 'key-openrouter',
+      ollama_host: 'key-ollama',
+    };
+    for (const [k, elId] of Object.entries(providerFields)) {
+      const el = document.getElementById(elId);
+      if (el && state.settings[k]) el.value = state.settings[k];
+    }
     openModal('settings-overlay');
   });
 
@@ -1881,7 +2157,7 @@ function bindEvents() {
   });
   document.getElementById('clear-btn').addEventListener('click', clearConversation);
   document.getElementById('rename-btn').addEventListener('click', startRename);
-  document.getElementById('compare-btn').addEventListener('click', () => {
+  document.getElementById('compare-btn')?.addEventListener('click', () => {
     state.compareHistory = { a: [], b: [] };
     document.getElementById('compare-messages-a').innerHTML = '';
     document.getElementById('compare-messages-b').innerHTML = '';
@@ -1933,8 +2209,8 @@ function bindEvents() {
   document.querySelectorAll('.bg-pattern-btn').forEach(btn => {
     btn.addEventListener('click', () => { applyBgPattern(btn.dataset.pattern); saveSettingLocal('bg_pattern', btn.dataset.pattern); });
   });
-  document.getElementById('setting-font-size').addEventListener('change', (e) => applyFontSize(e.target.value));
-  document.getElementById('setting-compact').addEventListener('change', (e) => document.body.classList.toggle('compact', e.target.value === 'true'));
+  document.getElementById('setting-font-size')?.addEventListener('change', (e) => applyFontSize(e.target.value));
+  document.getElementById('setting-compact')?.addEventListener('change', (e) => document.body.classList.toggle('compact', e.target.value === 'true'));
 
   // Modals
   document.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => closeModal(btn.dataset.close)));
@@ -2018,8 +2294,8 @@ function bindEvents() {
   });
 
   // Email
-  document.getElementById('compose-btn').addEventListener('click', () => openModal('compose-overlay'));
-  document.getElementById('compose-send-email-btn').addEventListener('click', async () => {
+  document.getElementById('compose-btn')?.addEventListener('click', () => openModal('compose-overlay'));
+  document.getElementById('compose-send-email-btn')?.addEventListener('click', async () => {
     const to = document.getElementById('compose-to').value;
     const subject = document.getElementById('compose-subject').value;
     const body = document.getElementById('compose-body').value;
@@ -2027,13 +2303,13 @@ function bindEvents() {
     try { await API.post('/api/email/send', { to, subject, body }); showToast('Email sent', 'success'); closeModal('compose-overlay'); }
     catch (e) { showToast(`Send failed: ${e.message}`, 'error'); }
   });
-  document.getElementById('refresh-inbox-btn').addEventListener('click', () => loadEmailInbox(state.currentEmailFolder));
-  document.getElementById('email-back-btn').addEventListener('click', () => {
+  document.getElementById('refresh-inbox-btn')?.addEventListener('click', () => loadEmailInbox(state.currentEmailFolder));
+  document.getElementById('email-back-btn')?.addEventListener('click', () => {
     document.getElementById('email-detail-panel').style.display = 'none';
     document.getElementById('email-list-panel').style.display = 'flex';
   });
-  document.getElementById('email-triage-single-btn').addEventListener('click', triageCurrentEmail);
-  document.getElementById('email-reply-btn').addEventListener('click', () => {
+  document.getElementById('email-triage-single-btn')?.addEventListener('click', triageCurrentEmail);
+  document.getElementById('email-reply-btn')?.addEventListener('click', () => {
     openModal('compose-overlay');
   });
   document.querySelectorAll('.email-folder').forEach(f => {
@@ -2054,7 +2330,7 @@ function bindEvents() {
       }
     });
   });
-  document.getElementById('scan-unsub-btn').addEventListener('click', scanSubscriptions);
+  document.getElementById('scan-unsub-btn')?.addEventListener('click', scanSubscriptions);
 
   // Calendar
   document.getElementById('cal-prev').addEventListener('click', () => { state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() - 1, 1); loadCalendarEvents(); });
@@ -2085,8 +2361,18 @@ function bindEvents() {
   document.getElementById('scan-hardware-btn').addEventListener('click', scanHardware);
 
   // Memory
-  document.getElementById('memory-search').addEventListener('input', (e) => { state.memoryFilter = e.target.value; renderMemory(); });
+  document.getElementById('memory-search').addEventListener('input', () => loadMemories());
   document.getElementById('clear-memories-btn').addEventListener('click', clearAllMemories);
+  document.getElementById('add-memory-btn')?.addEventListener('click', () => openModal('add-memory-overlay'));
+  document.getElementById('save-memory-btn')?.addEventListener('click', saveMemory);
+  document.querySelectorAll('.memory-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.memory-cat-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _memoryCategoryFilter = btn.dataset.cat || '';
+      loadMemories();
+    });
+  });
 
   // Global keyboard shortcuts
   document.addEventListener('keydown', (e) => {
@@ -2115,6 +2401,510 @@ function bindEvents() {
   });
 
   document.getElementById('sidebar-overlay').addEventListener('click', closeMobileSidebar);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  EXTENDED EVENTS (auth, themes, gallery, account, admin,
+//  shortcuts, mobile nav, animated bg)
+// ═══════════════════════════════════════════════════════════
+function bindExtendedEvents() {
+
+  // Forge — manual hardware entry
+  document.getElementById('manual-hw-btn')?.addEventListener('click', () => {
+    const f = document.getElementById('manual-hw-form');
+    if (f) f.style.display = f.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('cancel-manual-hw-btn')?.addEventListener('click', () => {
+    document.getElementById('manual-hw-form').style.display = 'none';
+  });
+  document.getElementById('apply-manual-hw-btn')?.addEventListener('click', applyManualHardware);
+
+  // Forge — tier filter buttons
+  document.querySelectorAll('.forge-filter-btn[data-tier]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.forge-filter-btn[data-tier]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _forgeTierFilter = btn.dataset.tier;
+      renderCookbookModels();
+    });
+  });
+
+  // Forge — search
+  document.getElementById('forge-search')?.addEventListener('input', (e) => {
+    _forgeSearch = e.target.value.trim().toLowerCase();
+    renderCookbookModels();
+  });
+
+  // Memory — edit save
+  document.getElementById('save-edit-memory-btn')?.addEventListener('click', saveEditMemory);
+
+  // Settings — memory auto-extract toggle
+  document.getElementById('setting-memory-extract')?.addEventListener('change', (e) => {
+    saveSettingLocal('memory_auto_extract', e.target.checked ? 'true' : 'false').catch(() => {});
+  });
+
+  // Compare button in tools collapse
+  document.getElementById('compare-nav-btn')?.addEventListener('click', () => {
+    state.compareHistory = { a: [], b: [] };
+    document.getElementById('compare-messages-a').innerHTML = '';
+    document.getElementById('compare-messages-b').innerHTML = '';
+    openModal('compare-overlay');
+  });
+
+  // ── Hamburger ──────────────────────────────────────────
+  document.getElementById('hamburger-btn')?.addEventListener('click', () => {
+    const sb = document.getElementById('chat-sidebar');
+    if (sb.classList.contains('mobile-open')) closeMobileSidebar();
+    else openMobileSidebar();
+  });
+
+  // ── User avatar → account settings tab ────────────────
+  document.getElementById('nav-user-avatar')?.addEventListener('click', () => {
+    openModal('settings-overlay');
+    const tab = document.querySelector('#settings-modal [data-tab="tab-account"]');
+    if (tab) tab.click();
+  });
+
+  // ── Logout ─────────────────────────────────────────────
+  document.getElementById('logout-btn')?.addEventListener('click', async () => {
+    try { await fetch('/api/auth/logout', { method: 'POST', headers: getAuthHeaders(), credentials: 'include' }); } catch {}
+    redirectToLogin();
+  });
+
+  // ── Change password ────────────────────────────────────
+  document.getElementById('change-password-btn')?.addEventListener('click', async () => {
+    const cur = document.getElementById('pw-current').value;
+    const nw = document.getElementById('pw-new').value;
+    const conf = document.getElementById('pw-confirm').value;
+    const errEl = document.getElementById('pw-error');
+    errEl.style.display = 'none';
+    if (nw !== conf) { errEl.textContent = 'New passwords do not match.'; errEl.style.display = ''; return; }
+    if (nw.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; errEl.style.display = ''; return; }
+    try {
+      await API.post('/api/auth/change-password', { current_password: cur, new_password: nw });
+      document.getElementById('pw-current').value = '';
+      document.getElementById('pw-new').value = '';
+      document.getElementById('pw-confirm').value = '';
+      showToast('Password changed successfully', 'success');
+    } catch (e) { errEl.textContent = e.message; errEl.style.display = ''; }
+  });
+
+  // ── Admin tab: load users ──────────────────────────────
+  document.querySelector('[data-tab="tab-admin"]')?.addEventListener('click', loadAdminUsers);
+
+  document.getElementById('add-user-btn')?.addEventListener('click', () => {
+    const form = document.getElementById('add-user-form');
+    if (form) form.style.display = form.style.display === 'none' ? '' : 'none';
+  });
+  document.getElementById('cancel-add-user-btn')?.addEventListener('click', () => {
+    document.getElementById('add-user-form').style.display = 'none';
+  });
+  document.getElementById('create-user-btn')?.addEventListener('click', async () => {
+    const username = document.getElementById('new-username').value.trim();
+    const password = document.getElementById('new-user-password').value;
+    const isAdmin = document.getElementById('new-user-admin').checked;
+    if (!username || !password) { showToast('Username and password required', 'warning'); return; }
+    try {
+      await API.post('/api/users/', { username, password, is_admin: isAdmin });
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-user-password').value = '';
+      document.getElementById('new-user-admin').checked = false;
+      document.getElementById('add-user-form').style.display = 'none';
+      await loadAdminUsers();
+      showToast(`User "${username}" created`, 'success');
+    } catch (e) { showToast(e.message, 'error'); }
+  });
+
+  // ── Theme: custom creator ──────────────────────────────
+  const customColorIds = ['c-bg','c-fg','c-panel','c-panel2','c-border','c-accent','c-muted','c-codebg'];
+  customColorIds.forEach(id => {
+    document.getElementById(id)?.addEventListener('input', previewCustomTheme);
+  });
+  document.getElementById('apply-custom-theme-btn')?.addEventListener('click', applyCustomTheme);
+
+  // ── Theme: animated background ─────────────────────────
+  document.querySelectorAll('.bg-pattern-btn[data-anim]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bg-pattern-btn[data-anim]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setAnimatedBackground(btn.dataset.anim);
+      saveSettingLocal('animated_bg', btn.dataset.anim).catch(() => {});
+    });
+  });
+
+  // ── Font selector ──────────────────────────────────────
+  document.querySelectorAll('.font-btn[data-font]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFont(btn.dataset.font);
+      saveSettingLocal('font_family', btn.dataset.font).catch(() => {});
+    });
+  });
+
+  // ── Density selector ──────────────────────────────────
+  document.getElementById('setting-density')?.addEventListener('change', (e) => {
+    document.body.classList.remove('density-compact', 'density-spacious');
+    if (e.target.value) document.body.classList.add(e.target.value);
+    saveSettingLocal('density', e.target.value).catch(() => {});
+  });
+
+  // ── Accent reset ───────────────────────────────────────
+  document.getElementById('reset-accent-btn')?.addEventListener('click', () => {
+    document.documentElement.style.removeProperty('--red');
+    saveSettingLocal('accent_color', '').catch(() => {});
+    showToast('Accent color reset', 'info');
+  });
+
+  // ── Shortcuts tab ──────────────────────────────────────
+  document.querySelectorAll('.shortcut-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => startShortcutCapture(btn));
+  });
+  document.getElementById('reset-shortcuts-btn')?.addEventListener('click', () => {
+    localStorage.removeItem('glyndwr_shortcuts');
+    showToast('Shortcuts reset to defaults', 'success');
+  });
+
+  // ── Mobile swipe gestures ──────────────────────────────
+  initSwipeGestures();
+
+  // ── Gallery section nav ────────────────────────────────
+  document.querySelector('.nav-item[data-section="gallery"]')?.addEventListener('click', () => {
+    if (typeof ImageEditor !== 'undefined') ImageEditor.loadGalleryList();
+  });
+}
+
+// ── Admin users ────────────────────────────────────────────
+async function loadAdminUsers() {
+  const tbody = document.getElementById('users-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-faint)">Loading…</td></tr>';
+  try {
+    const users = await API.get('/api/users/');
+    tbody.innerHTML = '';
+    users.forEach(u => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escHtml(u.username)}</td>
+        <td><span class="role-badge">${u.is_admin ? 'admin' : 'user'}</span></td>
+        <td style="font-size:11px;color:var(--text-faint)">${formatDate(u.created_at)}</td>
+        <td>
+          <div class="user-actions">
+            <button class="btn btn-secondary btn-sm" onclick="toggleAdminRole('${escHtml(u.id)}', ${!!u.is_admin})">${u.is_admin ? 'Demote' : 'Promote'}</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteUser('${escHtml(u.id)}', '${escHtml(u.username)}')">Delete</button>
+          </div>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (e) { tbody.innerHTML = `<tr><td colspan="4" style="color:var(--red)">${escHtml(e.message)}</td></tr>`; }
+}
+
+window.toggleAdminRole = async function(id, currentlyAdmin) {
+  try {
+    await API.put(`/api/users/${id}`, { is_admin: !currentlyAdmin });
+    await loadAdminUsers();
+    showToast('Role updated', 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+window.deleteUser = async function(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  try {
+    await API.del(`/api/users/${id}`);
+    await loadAdminUsers();
+    showToast(`User "${name}" deleted`, 'success');
+  } catch (e) { showToast(e.message, 'error'); }
+};
+
+// ── Custom theme ────────────────────────────────────────────
+function previewCustomTheme() {
+  const get = id => document.getElementById(id)?.value || '';
+  document.documentElement.style.setProperty('--c-bg', get('c-bg'));
+  document.documentElement.style.setProperty('--c-fg', get('c-fg'));
+  document.documentElement.style.setProperty('--c-panel', get('c-panel'));
+  document.documentElement.style.setProperty('--c-panel2', get('c-panel2'));
+  document.documentElement.style.setProperty('--c-border', get('c-border'));
+  document.documentElement.style.setProperty('--c-accent', get('c-accent'));
+  document.documentElement.style.setProperty('--c-muted', get('c-muted'));
+  document.documentElement.style.setProperty('--c-codebg', get('c-codebg'));
+  // Update preview bar
+  const pb = id => document.getElementById(id);
+  if (pb('prev-bg')) pb('prev-bg').style.background = get('c-bg');
+  if (pb('prev-panel')) pb('prev-panel').style.background = get('c-panel');
+  if (pb('prev-accent')) pb('prev-accent').style.background = get('c-accent');
+  if (pb('prev-fg')) pb('prev-fg').style.background = get('c-fg');
+  // Update custom swatch preview
+  const d1 = document.getElementById('custom-swatch-dot1');
+  const d2 = document.getElementById('custom-swatch-dot2');
+  const d3 = document.getElementById('custom-swatch-dot3');
+  if (d1) d1.style.background = get('c-accent');
+  if (d2) d2.style.background = get('c-fg');
+  if (d3) d3.style.background = get('c-panel');
+  const lbl = document.getElementById('custom-swatch-label');
+  if (lbl) { lbl.style.background = get('c-panel'); lbl.style.color = get('c-fg'); }
+  const swatch = document.getElementById('custom-theme-swatch');
+  if (swatch) swatch.querySelector('.swatch-preview').style.background = get('c-bg');
+}
+
+function applyCustomTheme() {
+  previewCustomTheme();
+  applyTheme('custom');
+  // Save custom colors to localStorage for persistence
+  const customData = {};
+  ['c-bg','c-fg','c-panel','c-panel2','c-border','c-accent','c-muted','c-codebg'].forEach(id => {
+    customData[id] = document.getElementById(id)?.value || '';
+  });
+  localStorage.setItem('glyndwr_custom_theme', JSON.stringify(customData));
+  showToast('Custom theme applied', 'success');
+}
+
+function restoreCustomTheme() {
+  const saved = localStorage.getItem('glyndwr_custom_theme');
+  if (!saved) return;
+  try {
+    const data = JSON.parse(saved);
+    Object.entries(data).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+      document.documentElement.style.setProperty(`--${id}`, val);
+    });
+    previewCustomTheme();
+  } catch {}
+}
+
+// ── Font ────────────────────────────────────────────────────
+function applyFont(font) {
+  document.body.classList.remove('font-mono', 'font-sans', 'font-serif');
+  if (font) document.body.classList.add(`font-${font}`);
+}
+
+// ── Animated Background ─────────────────────────────────────
+let _animFrame = null;
+let _animType = 'none';
+let _animNodes = [];
+
+function initAnimatedBackground() {
+  const saved = state.settings['animated_bg'] || localStorage.getItem('glyndwr_animated_bg') || 'none';
+  const fontSaved = state.settings['font_family'] || 'mono';
+  const densitySaved = state.settings['density'] || '';
+  applyFont(fontSaved);
+  if (densitySaved) document.body.classList.add(densitySaved);
+  restoreCustomTheme();
+  setAnimatedBackground(saved);
+  // Mark active button
+  document.querySelectorAll('.bg-pattern-btn[data-anim]').forEach(b =>
+    b.classList.toggle('active', b.dataset.anim === saved)
+  );
+}
+
+function setAnimatedBackground(type) {
+  _animType = type;
+  const canvas = document.getElementById('bg-canvas');
+  if (!canvas) return;
+  if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.body.classList.toggle('bg-canvas-on', type !== 'none');
+  if (type === 'none') return;
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  });
+  _animNodes = [];
+  if (type === 'synapse') _startSynapse(canvas, ctx);
+  else if (type === 'rain') _startRain(canvas, ctx);
+  else if (type === 'stars') _startStars(canvas, ctx);
+  else if (type === 'sparkles') _startSparkles(canvas, ctx);
+  else if (type === 'embers') _startEmbers(canvas, ctx);
+}
+
+function _accentColor() {
+  return getComputedStyle(document.body).getPropertyValue('--red').trim() || '#cc2800';
+}
+
+function _startSynapse(canvas, ctx) {
+  const N = 40;
+  for (let i = 0; i < N; i++) _animNodes.push({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    vx: (Math.random() - 0.5) * 0.5, vy: (Math.random() - 0.5) * 0.5,
+    pulse: Math.random() * Math.PI * 2, r: Math.random() * 2 + 1,
+  });
+  function draw() {
+    if (_animType !== 'synapse') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const col = _accentColor();
+    _animNodes.forEach(n => {
+      n.x += n.vx; n.y += n.vy; n.pulse += 0.018;
+      if (n.x < 0 || n.x > canvas.width) n.vx *= -1;
+      if (n.y < 0 || n.y > canvas.height) n.vy *= -1;
+    });
+    for (let i = 0; i < _animNodes.length; i++) for (let j = i+1; j < _animNodes.length; j++) {
+      const dx = _animNodes[i].x - _animNodes[j].x, dy = _animNodes[i].y - _animNodes[j].y;
+      const d = Math.sqrt(dx*dx + dy*dy);
+      if (d < 160) {
+        ctx.beginPath(); ctx.moveTo(_animNodes[i].x, _animNodes[i].y); ctx.lineTo(_animNodes[j].x, _animNodes[j].y);
+        ctx.strokeStyle = col + Math.round(0.18 * (1 - d/160) * 255).toString(16).padStart(2,'0');
+        ctx.lineWidth = 0.5; ctx.stroke();
+      }
+    }
+    _animNodes.forEach(n => {
+      const g = 0.5 + 0.5 * Math.sin(n.pulse);
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r * g, 0, Math.PI*2);
+      ctx.fillStyle = col + Math.round(0.5 * g * 255).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+    _animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function _startRain(canvas, ctx) {
+  const drops = Array.from({length: 80}, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    speed: 2 + Math.random() * 4, length: 10 + Math.random() * 20, opacity: 0.1 + Math.random() * 0.3,
+  }));
+  function draw() {
+    if (_animType !== 'rain') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const col = _accentColor();
+    drops.forEach(d => {
+      d.y += d.speed;
+      if (d.y > canvas.height) { d.y = -d.length; d.x = Math.random() * canvas.width; }
+      ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x, d.y + d.length);
+      ctx.strokeStyle = col + Math.round(d.opacity * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth = 1; ctx.stroke();
+    });
+    _animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function _startStars(canvas, ctx) {
+  const stars = Array.from({length: 120}, () => ({
+    x: Math.random() * canvas.width, y: Math.random() * canvas.height,
+    r: Math.random() * 1.5 + 0.3, opacity: Math.random(), phase: Math.random() * Math.PI * 2,
+  }));
+  function draw() {
+    if (_animType !== 'stars') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const col = _accentColor();
+    const t = Date.now() / 2000;
+    stars.forEach(s => {
+      const op = 0.2 + 0.6 * (0.5 + 0.5 * Math.sin(t + s.phase));
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = col + Math.round(op * 255).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+    _animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function _startSparkles(canvas, ctx) {
+  const sparks = Array.from({length: 50}, () => _newSparkle(canvas));
+  function _newSparkle(c) {
+    return { x: Math.random()*c.width, y: Math.random()*c.height, r: Math.random()*3+1, life: Math.random(), speed: 0.005+Math.random()*0.01 };
+  }
+  function draw() {
+    if (_animType !== 'sparkles') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const col = _accentColor();
+    sparks.forEach((s,i) => {
+      s.life += s.speed;
+      if (s.life > 1) { sparks[i] = _newSparkle(canvas); return; }
+      const op = Math.sin(s.life * Math.PI);
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r * op, 0, Math.PI*2);
+      ctx.fillStyle = col + Math.round(op * 200).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+    _animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+function _startEmbers(canvas, ctx) {
+  const embers = Array.from({length: 60}, () => ({
+    x: Math.random()*canvas.width, y: canvas.height + Math.random()*100,
+    vx: (Math.random()-0.5)*0.8, vy: -(0.5+Math.random()*1.5),
+    r: Math.random()*2+0.5, life: Math.random(), opacity: 0.2+Math.random()*0.6,
+  }));
+  function draw() {
+    if (_animType !== 'embers') return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const col = _accentColor();
+    embers.forEach(e => {
+      e.x += e.vx; e.y += e.vy; e.life -= 0.003;
+      if (e.y < -10 || e.life <= 0) { e.y = canvas.height + 10; e.x = Math.random()*canvas.width; e.life = 1; }
+      const op = e.life * e.opacity;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2);
+      ctx.fillStyle = col + Math.round(op * 255).toString(16).padStart(2,'0');
+      ctx.fill();
+    });
+    _animFrame = requestAnimationFrame(draw);
+  }
+  draw();
+}
+
+// ── Shortcut capture ────────────────────────────────────────
+function startShortcutCapture(btn) {
+  btn.classList.add('listening');
+  btn.textContent = 'Press key…';
+  function onKey(e) {
+    e.preventDefault(); e.stopPropagation();
+    const parts = [];
+    if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
+    if (e.shiftKey) parts.push('Shift');
+    if (e.altKey) parts.push('Alt');
+    if (!['Control','Shift','Alt','Meta'].includes(e.key)) parts.push(e.key.toUpperCase());
+    const combo = parts.join('+');
+    btn.classList.remove('listening');
+    btn.textContent = 'Edit';
+    const action = btn.dataset.action;
+    const display = document.getElementById(`sk-${action}`) || btn.previousElementSibling;
+    if (display) display.innerHTML = parts.map(k => `<kbd>${escHtml(k)}</kbd>`).join('+');
+    const shortcuts = JSON.parse(localStorage.getItem('glyndwr_shortcuts') || '{}');
+    shortcuts[action] = combo;
+    localStorage.setItem('glyndwr_shortcuts', JSON.stringify(shortcuts));
+    document.removeEventListener('keydown', onKey, true);
+    showToast(`Shortcut set: ${combo}`, 'success');
+  }
+  document.addEventListener('keydown', onKey, true);
+  // Cancel on blur
+  setTimeout(() => {
+    if (btn.classList.contains('listening')) {
+      btn.classList.remove('listening');
+      btn.textContent = 'Edit';
+      document.removeEventListener('keydown', onKey, true);
+    }
+  }, 5000);
+}
+
+// ── Mobile swipe gestures ───────────────────────────────────
+function initSwipeGestures() {
+  let touchStartX = 0, touchStartY = 0;
+  const SWIPE_THRESHOLD = 60;
+
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dy) > Math.abs(dx)) return;
+    if (dx > 0 && touchStartX < 30) {
+      // Swipe right from left edge → open sidebar
+      openMobileSidebar();
+    } else if (dx < 0) {
+      // Swipe left → close sidebar
+      closeMobileSidebar();
+      // Dismiss open modals
+      if (Math.abs(dx) > 100) {
+        document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(o => closeModal(o.id));
+      }
+    }
+  }, { passive: true });
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────

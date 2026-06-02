@@ -57,3 +57,14 @@ logs/
 # Cache
 .cache/
 .pytest_cache/
+
+# Launch script dependency sentinel
+.venv/.deps-ok
+.venv/.deps-installed
+
+# New route files that are new (untracked)
+routes/__pycache__/
+
+# Any local data
+data/
+*.db.bak

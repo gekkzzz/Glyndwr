@@ -6,20 +6,23 @@ from core.config import settings as app_settings
 # ─── Provider model catalogues ────────────────────────────────────────────────
 
 PROVIDER_MODELS: Dict[str, List[str]] = {
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo", "o1", "o3-mini"],
     "anthropic": [
         "claude-opus-4-8",
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
     ],
     "groq": [
         "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
         "mixtral-8x7b-32768",
         "gemma2-9b-it",
     ],
-    "openrouter": [],  # dynamic
+    "openrouter": [],   # dynamic
     "deepseek": ["deepseek-chat", "deepseek-reasoner"],
-    "ollama": [],  # dynamic
+    "ollama": [],       # dynamic — populated at runtime
     "gemini": [
         "gemini-2.0-flash",
         "gemini-1.5-flash",
@@ -28,49 +31,83 @@ PROVIDER_MODELS: Dict[str, List[str]] = {
 }
 
 PROVIDER_BASE_URLS: Dict[str, str] = {
-    "openai": "https://api.openai.com/v1",
-    "groq": "https://api.groq.com/openai/v1",
+    "openai":     "https://api.openai.com/v1",
+    "groq":       "https://api.groq.com/openai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
-    "deepseek": "https://api.deepseek.com/v1",
+    "deepseek":   "https://api.deepseek.com/v1",
 }
+
+# Known Groq model name fragments — anything else that looks like a local model
+# goes to Ollama instead of being misidentified as Groq.
+_GROQ_SUFFIXES = {"versatile", "instant", "32768", "specdec"}
 
 
 def _get_provider_for_model(model: str) -> str:
+    """
+    Determine which provider should handle a given model name.
+    Priority: explicit catalogue lookup → name-prefix for cloud APIs → Ollama fallback.
+    """
+    # 1. Exact match in catalogue
     for provider, models in PROVIDER_MODELS.items():
         if model in models:
             return provider
-    if model.startswith("gpt-") or model.startswith("o1") or model.startswith("o3"):
+
+    m = model.lower()
+
+    # 2. Unambiguous cloud-provider prefixes
+    if m.startswith("gpt-") or m.startswith("o1") or m.startswith("o3"):
         return "openai"
-    if model.startswith("claude-"):
+    if m.startswith("claude-"):
         return "anthropic"
-    if model.startswith("gemini"):
+    if m.startswith("gemini"):
         return "gemini"
-    if model.startswith("deepseek"):
+    if m.startswith("deepseek"):
         return "deepseek"
-    if model.startswith("llama") or model.startswith("mistral") or model.startswith("mixtral") or model.startswith("phi") or model.startswith("qwen") or model.startswith("gemma"):
+
+    # 3. Groq: only if the model name contains a Groq-specific suffix
+    #    (e.g. "llama-3.3-70b-versatile", "mixtral-8x7b-32768")
+    if any(s in m for s in _GROQ_SUFFIXES):
         return "groq"
-    return "ollama"  # fallback for local models
+
+    # 4. Everything else (llama3.2, mistral, gemma, phi, qwen, etc.)
+    #    is assumed to be a locally-served Ollama model.
+    return "ollama"
 
 
-def get_available_providers(cfg=None) -> Dict[str, List[str]]:
+def get_available_providers(cfg=None, db_settings: Optional[Dict] = None) -> Dict[str, List[str]]:
+    """
+    Return a dict of provider → model list for every configured provider.
+    Checks both env (cfg) and database settings (db_settings) for API keys.
+    """
     if cfg is None:
         cfg = app_settings
+    if db_settings is None:
+        db_settings = {}
+
+    def key(env_val, db_key):
+        """Return the first non-empty key from env or DB."""
+        return env_val or db_settings.get(db_key, "") or ""
+
     result: Dict[str, List[str]] = {}
-    if cfg.openai_api_key:
+
+    if key(cfg.openai_api_key, "openai_api_key"):
         result["openai"] = PROVIDER_MODELS["openai"]
-    if cfg.anthropic_api_key:
+    if key(cfg.anthropic_api_key, "anthropic_api_key"):
         result["anthropic"] = PROVIDER_MODELS["anthropic"]
-    if cfg.groq_api_key:
+    if key(cfg.groq_api_key, "groq_api_key"):
         result["groq"] = PROVIDER_MODELS["groq"]
-    if cfg.openrouter_api_key:
+    if key(cfg.openrouter_api_key, "openrouter_api_key"):
         result["openrouter"] = ["(fetch via /api/models/openrouter)"]
-    if cfg.gemini_api_key:
+    if key(cfg.gemini_api_key, "gemini_api_key"):
         result["gemini"] = PROVIDER_MODELS["gemini"]
-    if cfg.deepseek_api_key:
+    if key(cfg.deepseek_api_key, "deepseek_api_key"):
         result["deepseek"] = PROVIDER_MODELS["deepseek"]
-    # Ollama is opt-in: only include if a host is explicitly configured
-    if cfg.ollama_host and cfg.ollama_host != "http://localhost:11434":
-        result["ollama"] = []
+
+    # Ollama: always include if a host is set (localhost:11434 is a valid default)
+    ollama_host = db_settings.get("ollama_host") or cfg.ollama_host or ""
+    if ollama_host:
+        result["ollama"] = []   # model list populated dynamically
+
     return result
 
 
@@ -150,7 +187,6 @@ async def _stream_anthropic(
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
     }
-    # Filter out system messages – Anthropic uses a separate param
     filtered = [m for m in messages if m["role"] != "system"]
     payload: Dict[str, Any] = {
         "model": model,
@@ -204,7 +240,6 @@ async def _stream_gemini(
         f"https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:streamGenerateContent?key={api_key}&alt=sse"
     )
-    # Convert messages to Gemini format
     contents = []
     for m in messages:
         role = m["role"]
@@ -230,10 +265,8 @@ async def _stream_gemini(
                     chunk = json.loads(raw)
                 except json.JSONDecodeError:
                     continue
-                candidates = chunk.get("candidates", [])
-                for candidate in candidates:
-                    parts = candidate.get("content", {}).get("parts", [])
-                    for part in parts:
+                for candidate in chunk.get("candidates", []):
+                    for part in candidate.get("content", {}).get("parts", []):
                         text = part.get("text", "")
                         if text:
                             yield _sse(text)
@@ -250,18 +283,22 @@ async def stream_chat(
     model: str,
     messages: List[Dict[str, str]],
     system_prompt: str = "",
+    db_settings: Optional[Dict] = None,
     **kwargs,
 ) -> AsyncGenerator[str, None]:
     """
     Unified streaming entry point.
-    Yields SSE-formatted strings:
-      data: {"content": "...", "done": false}
-      data: {"content": "", "done": true, "total_tokens": N}
+    db_settings overrides env-based keys so users can configure providers
+    entirely within the app UI without touching .env.
     """
     cfg = app_settings
+    db = db_settings or {}
+
+    def k(env_val, db_key):
+        return db.get(db_key) or env_val or ""
 
     if provider == "openai":
-        api_key = cfg.openai_api_key or ""
+        api_key = k(cfg.openai_api_key, "openai_api_key")
         msgs = _prepend_system(messages, system_prompt)
         async for chunk in _stream_openai_compatible(
             PROVIDER_BASE_URLS["openai"], api_key, model, msgs
@@ -269,12 +306,12 @@ async def stream_chat(
             yield chunk
 
     elif provider == "anthropic":
-        api_key = cfg.anthropic_api_key or ""
+        api_key = k(cfg.anthropic_api_key, "anthropic_api_key")
         async for chunk in _stream_anthropic(api_key, model, messages, system_prompt):
             yield chunk
 
     elif provider == "groq":
-        api_key = cfg.groq_api_key or ""
+        api_key = k(cfg.groq_api_key, "groq_api_key")
         msgs = _prepend_system(messages, system_prompt)
         async for chunk in _stream_openai_compatible(
             PROVIDER_BASE_URLS["groq"], api_key, model, msgs
@@ -282,7 +319,7 @@ async def stream_chat(
             yield chunk
 
     elif provider == "openrouter":
-        api_key = cfg.openrouter_api_key or ""
+        api_key = k(cfg.openrouter_api_key, "openrouter_api_key")
         msgs = _prepend_system(messages, system_prompt)
         extra = {"HTTP-Referer": "https://glyndwr.local", "X-Title": "Glyndwr"}
         async for chunk in _stream_openai_compatible(
@@ -291,7 +328,7 @@ async def stream_chat(
             yield chunk
 
     elif provider == "deepseek":
-        api_key = cfg.deepseek_api_key or ""
+        api_key = k(cfg.deepseek_api_key, "deepseek_api_key")
         msgs = _prepend_system(messages, system_prompt)
         async for chunk in _stream_openai_compatible(
             PROVIDER_BASE_URLS["deepseek"], api_key, model, msgs
@@ -299,13 +336,15 @@ async def stream_chat(
             yield chunk
 
     elif provider == "ollama":
-        ollama_base = f"{cfg.ollama_host}/v1"
+        ollama_host = db.get("ollama_host") or cfg.ollama_host or "http://localhost:11434"
+        ollama_base = f"{ollama_host}/v1"
         msgs = _prepend_system(messages, system_prompt)
+        # Ollama's OpenAI-compatible endpoint accepts any non-empty key
         async for chunk in _stream_openai_compatible(ollama_base, "ollama", model, msgs):
             yield chunk
 
     elif provider == "gemini":
-        api_key = cfg.gemini_api_key or ""
+        api_key = k(cfg.gemini_api_key, "gemini_api_key")
         async for chunk in _stream_gemini(api_key, model, messages, system_prompt):
             yield chunk
 
@@ -316,7 +355,6 @@ async def stream_chat(
 def _prepend_system(
     messages: List[Dict[str, str]], system_prompt: str
 ) -> List[Dict[str, str]]:
-    """Prepend a system message if provided and not already present."""
     if not system_prompt:
         return messages
     if messages and messages[0].get("role") == "system":
@@ -328,7 +366,7 @@ def _prepend_system(
 
 async def list_ollama_models(host: Optional[str] = None) -> List[str]:
     if host is None:
-        host = app_settings.ollama_host
+        host = app_settings.ollama_host or "http://localhost:11434"
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{host}/api/tags")
@@ -339,55 +377,59 @@ async def list_ollama_models(host: Optional[str] = None) -> List[str]:
         return []
 
 
-async def test_provider_connection(provider: str, api_key: str) -> Dict[str, Any]:
-    """Quick connectivity test for a provider."""
+async def test_provider_connection(
+    provider: str, api_key: str, db_settings: Optional[Dict] = None
+) -> Dict[str, Any]:
+    db = db_settings or {}
+
+    def k(db_key):
+        return db.get(db_key) or api_key or ""
+
     try:
         if provider == "openai":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     "https://api.openai.com/v1/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    headers={"Authorization": f"Bearer {k('openai_api_key')}"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "anthropic":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     "https://api.anthropic.com/v1/models",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                    },
+                    headers={"x-api-key": k("anthropic_api_key"), "anthropic-version": "2023-06-01"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "groq":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     "https://api.groq.com/openai/v1/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    headers={"Authorization": f"Bearer {k('groq_api_key')}"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "gemini":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
-                    f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+                    f"https://generativelanguage.googleapis.com/v1beta/models?key={k('gemini_api_key')}"
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "deepseek":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     "https://api.deepseek.com/v1/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    headers={"Authorization": f"Bearer {k('deepseek_api_key')}"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "openrouter":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
                     "https://openrouter.ai/api/v1/models",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    headers={"Authorization": f"Bearer {k('openrouter_api_key')}"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "ollama":
-            models = await list_ollama_models(api_key or app_settings.ollama_host)
+            host = db.get("ollama_host") or api_key or app_settings.ollama_host or "http://localhost:11434"
+            models = await list_ollama_models(host)
             return {"ok": True, "models": models}
         else:
             return {"ok": False, "error": "Unknown provider"}

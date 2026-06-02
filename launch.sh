@@ -88,21 +88,31 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 URL="http://localhost:$PORT"
-echo ""
-echo -e "  ${MAGENTA}🚀  Starting Glyndwr on $URL${RESET}"
-echo -e "  📖  Press Ctrl+C to stop"
-echo ""
 
-# ── Open browser after delay ────────────────────────────
+# ── Open browser after server is ready ─────────────────
 open_browser() {
-  sleep 2
-  if command -v xdg-open &>/dev/null; then
-    xdg-open "$URL" &>/dev/null &
-  elif command -v open &>/dev/null; then
-    open "$URL" &>/dev/null &
-  fi
+  # Wait for the server to accept connections before opening
+  for i in $(seq 1 30); do
+    sleep 0.5
+    if curl -sf "$URL/health" &>/dev/null; then
+      echo ""
+      echo -e "  ${GREEN}Application live at:${RESET} ${CYAN}${BOLD}${URL}${RESET}"
+      echo ""
+      if command -v xdg-open &>/dev/null; then
+        xdg-open "$URL" &>/dev/null &
+      elif command -v open &>/dev/null; then
+        open "$URL" &>/dev/null &
+      fi
+      return
+    fi
+  done
 }
 open_browser &
+
+echo ""
+echo -e "  ${MAGENTA}[>] Starting Glyndwr...${RESET}"
+echo -e "      Press Ctrl+C to stop"
+echo ""
 
 # ── Run server ──────────────────────────────────────────
 exec uvicorn app:app --host 0.0.0.0 --port "$PORT" --reload

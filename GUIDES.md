@@ -49,6 +49,57 @@ account and prints the credentials to the terminal window:
 navigating away from the terminal. You can change it immediately after signing in via
 **Settings → Account → Change Password**.
 
+### Starting Glyndwr
+
+After cloning the repository and copying `.env.example` to `.env`, use one of these
+startup methods:
+
+- **Windows launcher**:
+  ```powershell
+  .\launch.ps1
+  ```
+  This creates the `.venv` if needed, installs dependencies, starts the server, and opens the
+  browser at the app URL. The script is located in the repository root.
+
+- **macOS / Linux launcher**:
+  ```bash
+  ./launch.sh
+  ```
+  This creates the `.venv` if needed, installs dependencies, starts the server, and opens the
+  browser when the app is ready. The script is located in the repository root.
+
+- **Direct Python launch** (when the venv is active):
+  ```powershell
+  .\.venv\Scripts\Activate.ps1
+  .venv\Scripts\python app.py
+  ```
+  or
+  ```bash
+  source .venv/bin/activate
+  .venv/bin/python app.py
+  ```
+  If your virtual environment is already active, `python app.py` is sufficient.
+
+### When to use each startup option
+
+| Method | Best for |
+|--------|----------|
+| `.\launch.ps1` | One-step Windows startup with venv creation, dependency install, and browser launch |
+| `./launch.sh` | One-step macOS/Linux startup with venv creation, dependency install, and browser launch |
+| `.venv\Scripts\python app.py` / `.venv/bin/python app.py` | Direct run after the venv is created, for debugging or manual control |
+| `docker compose up -d --build` | Containerized launch without installing local Python packages |
+
+- **Docker**:
+  ```bash
+  docker compose up -d --build
+  ```
+
+By default Glyndwr listens on port `7860`. Change the port in `.env` with `APP_PORT`
+if you need a different port.
+
+If the launcher is not available or you want a simpler startup, running `python app.py`
+from the repository root is also supported once the virtual environment is active.
+
 If you lose the password, reset it from the terminal:
 
 ```powershell
@@ -93,7 +144,7 @@ The model selector updates immediately without a restart.
 |----------|--------------------|-------|
 | OpenAI | platform.openai.com | GPT-4o, o1, o3 |
 | Anthropic | console.anthropic.com | Claude Opus 4, Sonnet 4 |
-| Groq | console.groq.com | Free tier, very fast |
+| Grok | grok-api.apidog.io | Free tier, very fast |
 | Google Gemini | aistudio.google.com | Gemini 2.0 Flash is free |
 | DeepSeek | platform.deepseek.com | Very affordable |
 | OpenRouter | openrouter.ai | 200+ models, one key |

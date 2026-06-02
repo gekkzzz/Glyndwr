@@ -141,8 +141,8 @@ async def ai_assist(doc_id: str, req: AIAssistRequest):
         api_key = settings.gemini_api_key or ""
         base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
     elif model.startswith("llama") or model.startswith("mixtral"):
-        api_key = settings.groq_api_key or ""
-        base_url = "https://api.groq.com/openai/v1"
+        api_key = settings.grok_api_key or ""
+        base_url = "https://grok-api.apidog.io/openai/v1"
 
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key configured")

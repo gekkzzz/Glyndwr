@@ -115,8 +115,8 @@ async def extract_from_conversation(body: ExtractRequest):
         db_settings = {**db_settings, "ollama_host": host}
     elif provider == "openai":
         api_key = k("openai_api_key", app_settings.openai_api_key)
-    elif provider == "groq":
-        api_key = k("groq_api_key", app_settings.groq_api_key)
+    elif provider == "grok":
+        api_key = k("grok_api_key", app_settings.grok_api_key)
     elif provider == "anthropic":
         api_key = k("anthropic_api_key", app_settings.anthropic_api_key)
     elif provider == "gemini":

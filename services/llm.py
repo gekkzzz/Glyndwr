@@ -14,7 +14,7 @@ PROVIDER_MODELS: Dict[str, List[str]] = {
         "claude-3-5-sonnet-20241022",
         "claude-3-5-haiku-20241022",
     ],
-    "groq": [
+    "grok": [
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
         "mixtral-8x7b-32768",
@@ -32,14 +32,14 @@ PROVIDER_MODELS: Dict[str, List[str]] = {
 
 PROVIDER_BASE_URLS: Dict[str, str] = {
     "openai":     "https://api.openai.com/v1",
-    "groq":       "https://api.groq.com/openai/v1",
+    "grok":       "https://grok-api.apidog.io/",
     "openrouter": "https://openrouter.ai/api/v1",
     "deepseek":   "https://api.deepseek.com/v1",
 }
 
-# Known Groq model name fragments — anything else that looks like a local model
-# goes to Ollama instead of being misidentified as Groq.
-_GROQ_SUFFIXES = {"versatile", "instant", "32768", "specdec"}
+# Known Grok model name fragments — anything else that looks like a local model
+# goes to Ollama instead of being misidentified as Grok.
+_GROK_SUFFIXES = {"versatile", "instant", "32768", "specdec"}
 
 
 def _get_provider_for_model(model: str) -> str:
@@ -64,10 +64,10 @@ def _get_provider_for_model(model: str) -> str:
     if m.startswith("deepseek"):
         return "deepseek"
 
-    # 3. Groq: only if the model name contains a Groq-specific suffix
+    # 3. Grok: only if the model name contains a Grok-specific suffix
     #    (e.g. "llama-3.3-70b-versatile", "mixtral-8x7b-32768")
-    if any(s in m for s in _GROQ_SUFFIXES):
-        return "groq"
+    if any(s in m for s in _GROK_SUFFIXES):
+        return "grok"
 
     # 4. Everything else (llama3.2, mistral, gemma, phi, qwen, etc.)
     #    is assumed to be a locally-served Ollama model.
@@ -94,8 +94,8 @@ def get_available_providers(cfg=None, db_settings: Optional[Dict] = None) -> Dic
         result["openai"] = PROVIDER_MODELS["openai"]
     if key(cfg.anthropic_api_key, "anthropic_api_key"):
         result["anthropic"] = PROVIDER_MODELS["anthropic"]
-    if key(cfg.groq_api_key, "groq_api_key"):
-        result["groq"] = PROVIDER_MODELS["groq"]
+    if key(cfg.grok_api_key, "grok_api_key"):
+        result["grok"] = PROVIDER_MODELS["grok"]
     if key(cfg.openrouter_api_key, "openrouter_api_key"):
         result["openrouter"] = ["(fetch via /api/models/openrouter)"]
     if key(cfg.gemini_api_key, "gemini_api_key"):
@@ -310,11 +310,11 @@ async def stream_chat(
         async for chunk in _stream_anthropic(api_key, model, messages, system_prompt):
             yield chunk
 
-    elif provider == "groq":
-        api_key = k(cfg.groq_api_key, "groq_api_key")
+    elif provider == "grok":
+        api_key = k(cfg.grok_api_key, "grok_api_key")
         msgs = _prepend_system(messages, system_prompt)
         async for chunk in _stream_openai_compatible(
-            PROVIDER_BASE_URLS["groq"], api_key, model, msgs
+            PROVIDER_BASE_URLS["grok"], api_key, model, msgs
         ):
             yield chunk
 
@@ -400,11 +400,11 @@ async def test_provider_connection(
                     headers={"x-api-key": k("anthropic_api_key"), "anthropic-version": "2023-06-01"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
-        elif provider == "groq":
+        elif provider == "grok":
             async with httpx.AsyncClient(timeout=10.0) as client:
                 r = await client.get(
-                    "https://api.groq.com/openai/v1/models",
-                    headers={"Authorization": f"Bearer {k('groq_api_key')}"},
+                    "https://grok-api.apidog.io/openai/v1/models",
+                    headers={"Authorization": f"Bearer {k('grok_api_key')}"},
                 )
                 return {"ok": r.status_code == 200, "status": r.status_code}
         elif provider == "gemini":

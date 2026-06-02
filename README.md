@@ -75,6 +75,63 @@ password in **Settings → Account**. Additional users can be created by admins 
 
 ---
 
+### Start Glyndwr
+
+Use one of these options after cloning the repository and copying `.env.example` to
+`.env`.
+
+**Launcher script (recommended):**
+
+- Windows:
+  ```powershell
+  .\launch.ps1
+  ```
+- macOS / Linux:
+  ```bash
+  ./launch.sh
+  ```
+
+These scripts create the `.venv` virtual environment if needed, install dependencies,
+ensure `.env` exists, start Uvicorn, and open the browser at the configured app URL.
+
+Both launcher files live in the repository root (`launch.ps1` and `launch.sh`). Use them when
+you want a one-step startup experience instead of manually activating the venv and running
+`app.py`.
+
+**Direct Python run:**
+
+- Windows:
+  ```powershell
+  .\.venv\Scripts\Activate.ps1
+  .venv\Scripts\python app.py
+  ```
+- macOS / Linux:
+  ```bash
+  source .venv/bin/activate
+  .venv/bin/python app.py
+  ```
+
+If your virtual environment is already active, `python app.py` is sufficient.
+
+### When to use each startup option
+
+| Method | Best for |
+|--------|----------|
+| `.\launch.ps1` / `./launch.sh` | One-step setup and run on Windows or macOS/Linux with dependency install and browser launch |
+| `.venv\Scripts\python app.py` / `.venv/bin/python app.py` | Direct launch when the virtual environment is already created and you want manual control |
+| `docker compose up -d --build` | Container-based deployment or an isolated environment without local Python package install |
+
+**Docker:**
+
+```bash
+docker compose up -d --build
+```
+
+The app is available at `http://localhost:7860` by default. Use `APP_PORT` in `.env`
+if you want a different port.
+
+---
+
 ### Windows
 
 **Requirements:** Python 3.9+, Git
@@ -87,8 +144,18 @@ notepad .env
 .\launch.ps1
 ```
 
-The launcher creates a `.venv`, installs dependencies, starts the server, and opens your browser
-at `http://localhost:7860`. Press `Ctrl+C` to stop.
+The PowerShell launcher does the heavy lifting for you: it creates the `.venv` if needed,
+installs dependencies, ensures `.env` exists, starts Uvicorn, and opens your browser at
+`http://localhost:7860`.
+
+If you prefer to start the app manually after the venv is ready, use:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+.venv\Scripts\python app.py
+```
+
+Press `Ctrl+C` to stop.
 
 **Docker:**
 
@@ -112,6 +179,16 @@ nano .env
 ./launch.sh
 ```
 
+The shell launcher creates the `.venv` virtual environment if needed, installs dependencies,
+ensures `.env` exists, starts Uvicorn, and opens your browser once the app is ready.
+
+If you prefer to launch manually after the venv is ready, use:
+
+```bash
+source .venv/bin/activate
+.venv/bin/python app.py
+```
+
 **Docker:**
 
 ```bash
@@ -130,7 +207,7 @@ you are not required to use any particular service.
 |----------|--------|--------------------|
 | **OpenAI** | GPT-4o, GPT-4o-mini, o1, o3 | platform.openai.com |
 | **Anthropic** | Claude Opus 4, Sonnet 4, Haiku 4 | console.anthropic.com |
-| **Groq** | Llama 3.3, Mixtral, Gemma (ultra-fast) | console.groq.com |
+| **Grok** | Llama 3.3, Mixtral, Gemma (ultra-fast) | grok-api.apidog.io |
 | **Google Gemini** | Gemini 2.0 Flash, 1.5 Pro | aistudio.google.com |
 | **DeepSeek** | DeepSeek Chat, Reasoner | platform.deepseek.com |
 | **OpenRouter** | 200+ models via one key | openrouter.ai |
@@ -186,7 +263,7 @@ Copy `.env.example` to `.env` and fill in what you need.
 # Add keys for any providers you want to use
 OPENAI_API_KEY=sk-...
 ANTHROPIC_API_KEY=sk-ant-...
-GROQ_API_KEY=gsk_...
+GROK_API_KEY=grok_...
 GEMINI_API_KEY=AIza...
 DEEPSEEK_API_KEY=sk-...
 OPENROUTER_API_KEY=sk-or-...

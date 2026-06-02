@@ -31,8 +31,8 @@ def _resolve_api(model: str, db_settings: dict) -> tuple[str, str]:
         return k("openai_api_key", app_settings.openai_api_key), PROVIDER_BASE_URLS["openai"]
     if provider == "anthropic":
         return k("anthropic_api_key", app_settings.anthropic_api_key), "https://api.anthropic.com/v1"
-    if provider == "groq":
-        return k("groq_api_key", app_settings.groq_api_key), PROVIDER_BASE_URLS["groq"]
+    if provider == "grok":
+        return k("grok_api_key", app_settings.grok_api_key), PROVIDER_BASE_URLS["grok"]
     if provider == "deepseek":
         return k("deepseek_api_key", app_settings.deepseek_api_key), PROVIDER_BASE_URLS["deepseek"]
     if provider == "openrouter":

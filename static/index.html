@@ -206,7 +206,13 @@
   <section id="section-agent" class="section">
     <div id="agent-container">
       <div id="agent-header">
-        <h2 class="section-heading">Agent</h2>
+        <div class="section-page-title">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3C8 3 5 6 5 10c0 3.9 5 9 7 11 2-2 7-7.1 7-11 0-4-3-7-7-7z"/><path d="M12 14a4 4 0 1 0 0-8 4 4 0 0 0 0 8z"/></svg>
+          <div>
+            <h2>Agent</h2>
+            <p>Action-oriented workflows powered by search, code, and browser tools</p>
+          </div>
+        </div>
         <div id="agent-controls">
           <select id="agent-model-select" title="Agent model"><option value="">Loading…</option></select>
           <div id="agent-tools-toggle">
@@ -766,8 +772,8 @@
           <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-anthropic" placeholder="sk-ant-…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('anthropic')">Test</button></div></div><div class="form-hint">Claude Opus 4, Sonnet 4, Haiku 4</div></div>
         </div>
         <div class="provider-section">
-          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">GRQ</span><span class="provider-header-name">Groq</span><span class="provider-status-tag" id="status-groq"></span><span style="color:var(--text-faint)">▾</span></div>
-          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-groq" placeholder="gsk_…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('groq')">Test</button></div></div><div class="form-hint">Ultra-fast: Llama, Mixtral, Gemma</div></div>
+          <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">GRK</span><span class="provider-header-name">Grok</span><span class="provider-status-tag" id="status-grok"></span><span style="color:var(--text-faint)">▾</span></div>
+          <div class="provider-body"><div class="form-group"><label class="form-label">API Key</label><div class="input-group"><input type="password" class="form-control" id="key-grok" placeholder="grok_…" autocomplete="off" /><button class="input-group-btn" onclick="testProvider('grok')">Test</button></div></div><div class="form-hint">Ultra-fast: Llama, Mixtral, Gemma</div></div>
         </div>
         <div class="provider-section">
           <div class="provider-header" onclick="this.nextElementSibling.classList.toggle('open')"><span class="provider-tag">GEM</span><span class="provider-header-name">Google Gemini</span><span class="provider-status-tag" id="status-gemini"></span><span style="color:var(--text-faint)">▾</span></div>
@@ -817,14 +823,62 @@
         <div id="custom-theme-creator">
           <div class="section-title" style="margin-bottom:10px">Custom Theme Colors</div>
           <div class="color-grid">
-            <div class="color-row"><label>Background</label><input type="color" id="c-bg" value="#0d0a09" /></div>
-            <div class="color-row"><label>Foreground</label><input type="color" id="c-fg" value="#f0e0d0" /></div>
-            <div class="color-row"><label>Panel</label><input type="color" id="c-panel" value="#1a0e0b" /></div>
-            <div class="color-row"><label>Panel 2</label><input type="color" id="c-panel2" value="#241410" /></div>
-            <div class="color-row"><label>Border</label><input type="color" id="c-border" value="#3d1a12" /></div>
-            <div class="color-row"><label>Accent</label><input type="color" id="c-accent" value="#cc2800" /></div>
-            <div class="color-row"><label>Muted text</label><input type="color" id="c-muted" value="#9a7a68" /></div>
-            <div class="color-row"><label>Code bg</label><input type="color" id="c-codebg" value="#0a0806" /></div>
+            <div class="color-row">
+              <label>Background</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-bg" style="background:#0d0a09"></span>
+                <input type="text" class="color-text-input" id="c-bg" value="#0d0a09" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Foreground</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-fg" style="background:#f0e0d0"></span>
+                <input type="text" class="color-text-input" id="c-fg" value="#f0e0d0" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Panel</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-panel" style="background:#1a0e0b"></span>
+                <input type="text" class="color-text-input" id="c-panel" value="#1a0e0b" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Panel 2</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-panel2" style="background:#241410"></span>
+                <input type="text" class="color-text-input" id="c-panel2" value="#241410" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Border</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-border" style="background:#3d1a12"></span>
+                <input type="text" class="color-text-input" id="c-border" value="#3d1a12" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Accent</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-accent" style="background:#cc2800"></span>
+                <input type="text" class="color-text-input" id="c-accent" value="#cc2800" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Muted text</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-muted" style="background:#9a7a68"></span>
+                <input type="text" class="color-text-input" id="c-muted" value="#9a7a68" placeholder="#rrggbb" />
+              </div>
+            </div>
+            <div class="color-row">
+              <label>Code bg</label>
+              <div class="color-field">
+                <span class="color-swatch" data-target="c-codebg" style="background:#0a0806"></span>
+                <input type="text" class="color-text-input" id="c-codebg" value="#0a0806" placeholder="#rrggbb" />
+              </div>
+            </div>
           </div>
           <div class="color-preview-bar" id="theme-preview-bar" style="margin-top:12px">
             <div class="color-preview-seg" id="prev-bg" style="background:#0d0a09;border-radius:3px 0 0 3px"></div>
@@ -885,8 +939,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Accent Color Override</label>
-          <div style="display:flex;align-items:center;gap:10px">
-            <input type="color" id="accent-color-picker" style="width:48px;height:36px" />
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div class="color-field" style="flex:1;min-width:180px">
+              <span class="color-swatch" id="accent-color-preview" style="background:#cc2800"></span>
+              <input type="text" id="accent-color-picker" class="color-text-input" placeholder="#cc2800" />
+            </div>
             <button class="btn btn-secondary btn-sm" id="reset-accent-btn">Reset</button>
             <span class="form-hint" style="margin:0">Overrides theme accent color</span>
           </div>
@@ -1085,6 +1142,43 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" data-close="settings-overlay">Close</button>
       <button class="btn btn-primary" id="save-settings-btn">Save Settings</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CONFIRM MODAL ──────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="confirm-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="confirm-title">Confirm</span>
+      <button class="modal-close" data-close="confirm-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="confirm-message" style="margin:0; color:var(--text);"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="confirm-overlay" id="confirm-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PROMPT MODAL ───────────────────────────────────────── -->
+<div class="modal-overlay hidden" id="prompt-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="prompt-title">Input</span>
+      <button class="modal-close" data-close="prompt-overlay">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <p id="prompt-message" style="margin:0 0 12px; color:var(--text);"></p>
+        <input type="text" class="form-control" id="prompt-input" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-close="prompt-overlay" id="prompt-cancel-btn">Cancel</button>
+      <button class="btn btn-primary" id="prompt-ok-btn">Submit</button>
     </div>
   </div>
 </div>

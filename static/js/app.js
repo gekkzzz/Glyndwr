@@ -270,8 +270,8 @@ function getProviderIcon(model) {
   if (m.startsWith('claude')) return '<span class="model-tag">ANT</span>';
   if (m.startsWith('gemini')) return '<span class="model-tag">GEM</span>';
   if (m.startsWith('deepseek')) return '<span class="model-tag">DSK</span>';
-  // Groq only for models with Groq-specific naming (versatile, instant, 32768)
-  if (/versatile|instant|32768|specdec/.test(m)) return '<span class="model-tag">GRQ</span>';
+  // Grok only for models with Grok-specific naming (versatile, instant, 32768)
+  if (/versatile|instant|32768|specdec/.test(m)) return '<span class="model-tag">GRK</span>';
   // Everything else (llama3.2, mistral, gemma, phi, qwen…) is a local Ollama model
   return '<span class="model-tag">LLM</span>';
 }
@@ -313,7 +313,7 @@ async function createConversation(initialMessage = null) {
 }
 
 async function deleteConversation(id) {
-  if (!confirm('Delete this conversation?')) return;
+  if (!await appConfirm('Delete this conversation?', { title: 'Delete conversation', confirmText: 'Delete', cancelText: 'Cancel', destructive: true })) return;
   try {
     await API.del(`/api/chat/${id}`);
     state.conversations = state.conversations.filter(c => c.id !== id);
@@ -524,8 +524,8 @@ function populateModelSelect(sel) {
   sel.innerHTML = '';
   const providers = state.availableModels;
   let hasAny = false;
-  const order = ['openai', 'anthropic', 'groq', 'gemini', 'deepseek', 'openrouter', 'ollama'];
-  const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', gemini: 'Google Gemini', deepseek: 'DeepSeek', openrouter: 'OpenRouter', ollama: 'Ollama (Local)' };
+  const order = ['openai', 'anthropic', 'grok', 'gemini', 'deepseek', 'openrouter', 'ollama'];
+  const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', grok: 'Grok', gemini: 'Google Gemini', deepseek: 'DeepSeek', openrouter: 'OpenRouter', ollama: 'Ollama (Local)' };
   for (const provider of order) {
     const models = providers[provider];
     if (!models || !models.length) continue;
@@ -566,8 +566,8 @@ function updateProviderStatus() {
   const container = document.getElementById('provider-status');
   if (!container) return;
   container.innerHTML = '';
-  const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', groq: 'Groq', gemini: 'Gemini', deepseek: 'DeepSeek', openrouter: 'OpenRouter', ollama: 'Ollama' };
-  const allProviders = ['openai', 'anthropic', 'groq', 'gemini', 'deepseek', 'openrouter', 'ollama'];
+  const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', grok: 'Grok', gemini: 'Gemini', deepseek: 'DeepSeek', openrouter: 'OpenRouter', ollama: 'Ollama' };
+  const allProviders = ['openai', 'anthropic', 'grok', 'gemini', 'deepseek', 'openrouter', 'ollama'];
   let anyActive = false;
   for (const p of allProviders) {
     const models = state.availableModels[p];
@@ -595,6 +595,28 @@ function applyTheme(theme) {
   saveSettingLocal('theme', theme).catch(() => {});
 }
 
+function normalizeHexColor(value) {
+  if (!value) return '';
+  let hex = value.trim();
+  if (!hex.startsWith('#')) hex = `#${hex}`;
+  if (/^#[0-9a-fA-F]{3}$/.test(hex) || /^#[0-9a-fA-F]{6}$/.test(hex)) {
+    return hex.toLowerCase();
+  }
+  return '';
+}
+
+function applyAccentColor(value) {
+  const color = normalizeHexColor(value);
+  const input = document.getElementById('accent-color-picker');
+  const preview = document.getElementById('accent-color-preview');
+  if (input) input.classList.toggle('invalid', Boolean(input.value.trim()) && !color);
+  if (preview) preview.style.background = color || 'transparent';
+  if (color) {
+    document.documentElement.style.setProperty('--red', color);
+  }
+  return color;
+}
+
 // ─── Settings ─────────────────────────────────────────────────────────────────
 async function loadSettings() {
   try {
@@ -618,7 +640,10 @@ async function loadSettings() {
     if (state.settings['accent_color']) {
       document.documentElement.style.setProperty('--red', state.settings['accent_color']);
       const picker = document.getElementById('accent-color-picker');
-      if (picker) picker.value = state.settings['accent_color'];
+      if (picker) {
+        picker.value = state.settings['accent_color'];
+        applyAccentColor(state.settings['accent_color']);
+      }
     }
     applyBgPattern(state.settings['bg_pattern'] || 'none');
     // Font + density (applied again in initAnimatedBackground but set early)
@@ -669,7 +694,7 @@ async function saveSettings() {
   const providerFields = {
     openai_api_key: 'key-openai',
     anthropic_api_key: 'key-anthropic',
-    groq_api_key: 'key-groq',
+    grok_api_key: 'key-grok',
     gemini_api_key: 'key-gemini',
     deepseek_api_key: 'key-deepseek',
     openrouter_api_key: 'key-openrouter',
@@ -755,7 +780,7 @@ async function saveConvSystemPrompt() {
 }
 
 async function clearConversation() {
-  if (!state.currentConversationId || !confirm('Clear all messages?')) return;
+  if (!state.currentConversationId || !await appConfirm('Clear all messages?', { title: 'Clear conversation', confirmText: 'Clear', cancelText: 'Cancel', destructive: true })) return;
   try {
     await API.del(`/api/chat/${state.currentConversationId}/messages`);
     state.messages = [];
@@ -767,8 +792,78 @@ async function clearConversation() {
 }
 
 // ─── Modal ────────────────────────────────────────────────────────────────────
+let _confirmResolver = null;
+
 function openModal(overlayId) { document.getElementById(overlayId).classList.remove('hidden'); }
 function closeModal(overlayId) { document.getElementById(overlayId).classList.add('hidden'); }
+
+function appConfirm(message, options = {}) {
+  const overlay = document.getElementById('confirm-overlay');
+  const titleEl = document.getElementById('confirm-title');
+  const messageEl = document.getElementById('confirm-message');
+  const okBtn = document.getElementById('confirm-ok-btn');
+  const cancelBtn = document.getElementById('confirm-cancel-btn');
+  if (!overlay || !titleEl || !messageEl || !okBtn || !cancelBtn) return Promise.resolve(false);
+  titleEl.textContent = options.title || 'Confirm';
+  messageEl.textContent = message;
+  okBtn.textContent = options.confirmText || 'Confirm';
+  okBtn.classList.toggle('btn-danger', options.destructive !== false);
+  okBtn.classList.toggle('btn-primary', options.destructive === false);
+  cancelBtn.textContent = options.cancelText || 'Cancel';
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      closeModal('confirm-overlay');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+      _confirmResolver = null;
+    };
+    const onOk = () => { cleanup(); resolve(true); };
+    const onCancel = () => { cleanup(); resolve(false); };
+    const onOverlayClick = (e) => { if (e.target === overlay) onCancel(); };
+    _confirmResolver = resolve;
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+    openModal('confirm-overlay');
+  });
+}
+
+function appPrompt(message, options = {}) {
+  const overlay = document.getElementById('prompt-overlay');
+  const titleEl = document.getElementById('prompt-title');
+  const messageEl = document.getElementById('prompt-message');
+  const inputEl = document.getElementById('prompt-input');
+  const okBtn = document.getElementById('prompt-ok-btn');
+  const cancelBtn = document.getElementById('prompt-cancel-btn');
+  if (!overlay || !titleEl || !messageEl || !inputEl || !okBtn || !cancelBtn) return Promise.resolve(null);
+  titleEl.textContent = options.title || 'Input';
+  messageEl.textContent = message;
+  inputEl.value = options.defaultValue || '';
+  inputEl.placeholder = options.placeholder || '';
+
+  return new Promise((resolve) => {
+    const cleanup = () => {
+      closeModal('prompt-overlay');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      overlay.removeEventListener('click', onOverlayClick);
+      inputEl.removeEventListener('keydown', onKeyDown);
+    };
+    const onOk = () => { cleanup(); resolve(inputEl.value.trim() || null); };
+    const onCancel = () => { cleanup(); resolve(null); };
+    const onOverlayClick = (e) => { if (e.target === overlay) onCancel(); };
+    const onKeyDown = (e) => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } else if (e.key === 'Escape') { e.preventDefault(); onCancel(); } };
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    overlay.addEventListener('click', onOverlayClick);
+    inputEl.addEventListener('keydown', onKeyDown);
+    openModal('prompt-overlay');
+    setTimeout(() => inputEl.focus(), 0);
+  });
+}
+
 function initTabs(container) {
   container.querySelectorAll('.modal-tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -939,7 +1034,7 @@ async function saveNote() {
 }
 
 async function deleteNote(id) {
-  if (!id || !confirm('Delete this note?')) return;
+  if (!id || !await appConfirm('Delete this note?', { title: 'Delete note', confirmText: 'Delete', cancelText: 'Cancel', destructive: true })) return;
   try {
     await API.del(`/api/notes/${id}`);
     state.notes = state.notes.filter(n => n.id !== id);
@@ -1174,7 +1269,7 @@ async function saveDoc() {
 }
 
 async function deleteDoc(id) {
-  if (!id || !confirm('Delete this document?')) return;
+  if (!id || !await appConfirm('Delete this document?', { title: 'Delete document', confirmText: 'Delete', cancelText: 'Cancel', destructive: true })) return;
   try {
     await API.del(`/api/documents/${id}`);
     state.documents = state.documents.filter(d => d.id !== id);
@@ -1481,14 +1576,14 @@ function makeCalDay(year, month, day, otherMonth, isToday = false) {
   }
   if (!otherMonth) {
     cell.addEventListener('click', async () => {
-      const title = prompt(`Add event for ${dateKey}:`);
-      if (title && title.trim()) {
+      const title = await appPrompt(`Add event for ${dateKey}:`, { title: 'Add Calendar Event', placeholder: 'Event title' });
+      if (title) {
         try {
-          await API.post('/api/calendar/events', { title: title.trim(), date: dateKey });
+          await API.post('/api/calendar/events', { title, date: dateKey });
           await loadCalendarEvents();
         } catch {
           if (!state.calendarEvents[dateKey]) state.calendarEvents[dateKey] = [];
-          state.calendarEvents[dateKey].push({ title: title.trim(), source: 'local' });
+          state.calendarEvents[dateKey].push({ title, source: 'local' });
           localStorage.setItem('glyndwr_calendar_events', JSON.stringify(state.calendarEvents));
           renderCalendar();
         }
@@ -1599,13 +1694,13 @@ async function extractMemoriesFromConversation(convId) {
 }
 
 window.deleteMemory = async function(id) {
-  if (!confirm('Delete this memory?')) return;
+  if (!await appConfirm('Delete this memory?', { title: 'Delete memory', confirmText: 'Delete', cancelText: 'Cancel', destructive: true })) return;
   try { await API.del(`/api/memories/${id}`); await loadMemories(); showToast('Memory deleted', 'success'); }
   catch (e) { showToast(e.message, 'error'); }
 };
 
 async function clearAllMemories() {
-  if (!confirm('Clear all memories? This cannot be undone.')) return;
+  if (!await appConfirm('Clear all memories? This cannot be undone.', { title: 'Clear memories', confirmText: 'Clear', cancelText: 'Cancel', destructive: true })) return;
   try { await API.del('/api/memories/all'); await loadMemories(); showToast('Memories cleared', 'success'); }
   catch (e) { showToast(e.message, 'error'); }
 }
@@ -2143,7 +2238,7 @@ function bindEvents() {
     // Populate saved provider keys from DB settings
     const providerFields = {
       openai_api_key: 'key-openai', anthropic_api_key: 'key-anthropic',
-      groq_api_key: 'key-groq', gemini_api_key: 'key-gemini',
+      grok_api_key: 'key-grok', gemini_api_key: 'key-gemini',
       deepseek_api_key: 'key-deepseek', openrouter_api_key: 'key-openrouter',
       ollama_host: 'key-ollama',
     };
@@ -2213,8 +2308,11 @@ function bindEvents() {
   });
   const accentPicker = document.getElementById('accent-color-picker');
   if (accentPicker) {
-    accentPicker.addEventListener('input', (e) => document.documentElement.style.setProperty('--red', e.target.value));
-    accentPicker.addEventListener('change', (e) => { document.documentElement.style.setProperty('--red', e.target.value); saveSettingLocal('accent_color', e.target.value); });
+    accentPicker.addEventListener('input', (e) => applyAccentColor(e.target.value));
+    accentPicker.addEventListener('change', (e) => {
+      const color = applyAccentColor(e.target.value);
+      if (color) saveSettingLocal('accent_color', color).catch(() => {});
+    });
   }
   document.querySelectorAll('.bg-pattern-btn').forEach(btn => {
     btn.addEventListener('click', () => { applyBgPattern(btn.dataset.pattern); saveSettingLocal('bg_pattern', btn.dataset.pattern); });
@@ -2347,14 +2445,14 @@ function bindEvents() {
   document.getElementById('cal-next').addEventListener('click', () => { state.calendarDate = new Date(state.calendarDate.getFullYear(), state.calendarDate.getMonth() + 1, 1); loadCalendarEvents(); });
   document.getElementById('cal-today').addEventListener('click', () => { state.calendarDate = new Date(); loadCalendarEvents(); });
   document.getElementById('cal-sync-btn').addEventListener('click', syncCalDAV);
-  document.getElementById('cal-add-event').addEventListener('click', () => {
+  document.getElementById('cal-add-event').addEventListener('click', async () => {
     const today = new Date();
     const dateKey = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
-    const title = prompt(`Add event for today (${dateKey}):`);
-    if (title && title.trim()) {
-      API.post('/api/calendar/events', { title: title.trim(), date: dateKey })
+    const title = await appPrompt(`Add event for today (${dateKey}):`, { title: 'Add Calendar Event', placeholder: 'Event title' });
+    if (title) {
+      API.post('/api/calendar/events', { title, date: dateKey })
         .then(() => loadCalendarEvents())
-        .catch(() => { if (!state.calendarEvents[dateKey]) state.calendarEvents[dateKey] = []; state.calendarEvents[dateKey].push({ title: title.trim() }); localStorage.setItem('glyndwr_calendar_events', JSON.stringify(state.calendarEvents)); renderCalendar(); });
+        .catch(() => { if (!state.calendarEvents[dateKey]) state.calendarEvents[dateKey] = []; state.calendarEvents[dateKey].push({ title }); localStorage.setItem('glyndwr_calendar_events', JSON.stringify(state.calendarEvents)); renderCalendar(); });
     }
   });
 
@@ -2618,7 +2716,7 @@ window.toggleAdminRole = async function(id, currentlyAdmin) {
 };
 
 window.deleteUser = async function(id, name) {
-  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  if (!await appConfirm(`Delete user "${name}"? This cannot be undone.`, { title: 'Delete user', confirmText: 'Delete', cancelText: 'Cancel', destructive: true })) return;
   try {
     await API.del(`/api/users/${id}`);
     await loadAdminUsers();
@@ -2628,32 +2726,48 @@ window.deleteUser = async function(id, name) {
 
 // ── Custom theme ────────────────────────────────────────────
 function previewCustomTheme() {
-  const get = id => document.getElementById(id)?.value || '';
-  document.documentElement.style.setProperty('--c-bg', get('c-bg'));
-  document.documentElement.style.setProperty('--c-fg', get('c-fg'));
-  document.documentElement.style.setProperty('--c-panel', get('c-panel'));
-  document.documentElement.style.setProperty('--c-panel2', get('c-panel2'));
-  document.documentElement.style.setProperty('--c-border', get('c-border'));
-  document.documentElement.style.setProperty('--c-accent', get('c-accent'));
-  document.documentElement.style.setProperty('--c-muted', get('c-muted'));
-  document.documentElement.style.setProperty('--c-codebg', get('c-codebg'));
+  const get = id => normalizeHexColor(document.getElementById(id)?.value || '');
+  const updateField = id => {
+    const input = document.getElementById(id);
+    const value = normalizeHexColor(input?.value || '');
+    if (input) input.classList.toggle('invalid', Boolean(input.value.trim()) && !value);
+    const swatch = document.querySelector(`.color-swatch[data-target="${id}"]`);
+    if (swatch) swatch.style.background = value || 'transparent';
+    return value;
+  };
+  const bg = updateField('c-bg');
+  const fg = updateField('c-fg');
+  const panel = updateField('c-panel');
+  const panel2 = updateField('c-panel2');
+  const border = updateField('c-border');
+  const accent = updateField('c-accent');
+  const muted = updateField('c-muted');
+  const codebg = updateField('c-codebg');
+  if (bg) document.documentElement.style.setProperty('--c-bg', bg);
+  if (fg) document.documentElement.style.setProperty('--c-fg', fg);
+  if (panel) document.documentElement.style.setProperty('--c-panel', panel);
+  if (panel2) document.documentElement.style.setProperty('--c-panel2', panel2);
+  if (border) document.documentElement.style.setProperty('--c-border', border);
+  if (accent) document.documentElement.style.setProperty('--c-accent', accent);
+  if (muted) document.documentElement.style.setProperty('--c-muted', muted);
+  if (codebg) document.documentElement.style.setProperty('--c-codebg', codebg);
   // Update preview bar
   const pb = id => document.getElementById(id);
-  if (pb('prev-bg')) pb('prev-bg').style.background = get('c-bg');
-  if (pb('prev-panel')) pb('prev-panel').style.background = get('c-panel');
-  if (pb('prev-accent')) pb('prev-accent').style.background = get('c-accent');
-  if (pb('prev-fg')) pb('prev-fg').style.background = get('c-fg');
+  if (pb('prev-bg')) pb('prev-bg').style.background = bg || '#000';
+  if (pb('prev-panel')) pb('prev-panel').style.background = panel || '#000';
+  if (pb('prev-accent')) pb('prev-accent').style.background = accent || '#000';
+  if (pb('prev-fg')) pb('prev-fg').style.background = fg || '#fff';
   // Update custom swatch preview
   const d1 = document.getElementById('custom-swatch-dot1');
   const d2 = document.getElementById('custom-swatch-dot2');
   const d3 = document.getElementById('custom-swatch-dot3');
-  if (d1) d1.style.background = get('c-accent');
-  if (d2) d2.style.background = get('c-fg');
-  if (d3) d3.style.background = get('c-panel');
+  if (d1) d1.style.background = accent || '#000';
+  if (d2) d2.style.background = fg || '#fff';
+  if (d3) d3.style.background = panel || '#000';
   const lbl = document.getElementById('custom-swatch-label');
-  if (lbl) { lbl.style.background = get('c-panel'); lbl.style.color = get('c-fg'); }
+  if (lbl) { lbl.style.background = panel || '#000'; lbl.style.color = fg || '#fff'; }
   const swatch = document.getElementById('custom-theme-swatch');
-  if (swatch) swatch.querySelector('.swatch-preview').style.background = get('c-bg');
+  if (swatch) swatch.querySelector('.swatch-preview').style.background = bg || '#000';
 }
 
 function applyCustomTheme() {
@@ -2674,9 +2788,10 @@ function restoreCustomTheme() {
   try {
     const data = JSON.parse(saved);
     Object.entries(data).forEach(([id, val]) => {
+      const normalized = normalizeHexColor(val);
       const el = document.getElementById(id);
-      if (el) el.value = val;
-      document.documentElement.style.setProperty(`--${id}`, val);
+      if (el) el.value = normalized || val;
+      if (normalized) document.documentElement.style.setProperty(`--${id}`, normalized);
     });
     previewCustomTheme();
   } catch {}

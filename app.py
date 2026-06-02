@@ -130,10 +130,24 @@ async def api_status():
 
 
 if __name__ == "__main__":
+    import signal
+    import sys
+
+    def _graceful_shutdown(signum, frame):
+        print("\n[Glyndwr] Shutdown signal received. Stopping server...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _graceful_shutdown)
+    signal.signal(signal.SIGTERM, _graceful_shutdown)
+
     uvicorn.run(
         "app:app",
         host=settings.app_host,
         port=settings.app_port,
         reload=False,
         log_level="info",
+        # Keep-alive and connection stability settings
+        timeout_keep_alive=120,
+        timeout_graceful_shutdown=10,
+        workers=1,
     )

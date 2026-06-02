@@ -1338,3 +1338,359 @@ body.font-lg { font-size: 17px; }
 
 /* Touch swipe support */
 .swipeable { touch-action: pan-y; user-select: none; }
+
+/* ═══════════════════════════════════════════════════
+   OVERHAUL v1.3 — Layout, Theme, Focus Mode & UI
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Task 1.1: Full-width section containers ────── */
+#research-container,
+#agent-container,
+#memory-container,
+#cookbook-container {
+  max-width: 100%;
+  width: 100%;
+}
+/* Allow the section wrappers to stretch fully */
+#section-research,
+#section-agent,
+#section-memory,
+#section-cookbook {
+  overflow-x: hidden;
+}
+/* Keep inner content readable with padding not max-width */
+#research-container { padding: 0; }
+#agent-container { padding: 0; }
+#memory-container { padding: 0 0 20px; }
+#cookbook-container { padding: 0; }
+
+/* Section header/content inner padding for readability */
+#research-header,
+#agent-header,
+#memory-header,
+#cookbook-header,
+#forge-hardware-panel,
+#forge-filter-bar,
+#research-pipeline,
+#research-sources,
+#agent-input-row,
+#research-input-row {
+  width: 100%;
+  box-sizing: border-box;
+}
+#research-report,
+#agent-messages,
+#memory-list,
+#cookbook-model-list {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ─── Task 1.2: Mobile responsiveness improvements ── */
+@media (max-width: 768px) {
+  /* Fix touch targets globally */
+  .nav-item, button, .btn { min-height: 44px; min-width: 44px; }
+  .nav-item { min-width: 44px; }
+  .btn-sm { min-height: 36px; }
+  /* Settings modal full-width on mobile */
+  .modal { width: 100%; max-width: 100vw; border-radius: 16px 16px 0 0; margin-top: auto; align-self: flex-end; }
+  .modal-overlay { align-items: flex-end; }
+  /* Memory section mobile */
+  #memory-container { padding: 0; }
+  #memory-header { padding: 16px; }
+  #memory-list { padding: 0 16px 20px; }
+  #memory-controls { flex-direction: column; }
+  #memory-search { min-width: unset; width: 100%; }
+  /* Research/Agent mobile */
+  #research-header, #agent-header { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+  #cookbook-header { padding: 12px 16px; }
+  #forge-filter-bar { padding: 12px 16px; }
+  #forge-search { max-width: 100%; width: 100%; margin-left: 0 !important; }
+  .forge-manual-grid { grid-template-columns: 1fr; }
+  /* Notes on mobile */
+  #section-notes.active { flex-direction: column; }
+  #notes-list-panel { width: 100%; min-width: unset; height: 200px; min-height: 200px; border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+@media (max-width: 480px) {
+  .section-page-title h2 { font-size: 16px; }
+  .section-page-title p { font-size: 11px; }
+  .memory-category-tabs { gap: 4px; }
+  .memory-cat-btn { padding: 5px 10px; font-size: 11px; }
+  .forge-filter-btn { padding: 5px 10px; font-size: 11px; }
+}
+
+/* ─── Task 1.3: Settings container & color-input fix ─ */
+.modal.tall { width: 680px; max-width: 96vw; }
+.color-row { flex-wrap: wrap; }
+.color-field { flex: 1; min-width: 0; overflow: hidden; }
+.color-text-input { min-width: 0; max-width: 100%; }
+.color-row label { flex: 0 0 90px; min-width: 90px; }
+#custom-theme-creator .color-grid { grid-template-columns: 1fr; }
+@media (min-width: 560px) {
+  #custom-theme-creator .color-grid { grid-template-columns: repeat(2, 1fr); }
+}
+/* Widen settings tabs area */
+#settings-modal .modal-tabs { flex-wrap: wrap; gap: 0; }
+#settings-modal .modal-tab { font-size: 12px; padding: 10px 10px; }
+
+/* ─── Task 1.4: Mabinogi theme code contrast fix ──── */
+.theme-mabinogi .message-bubble code:not(.hljs),
+.theme-mabinogi .code-block-wrapper pre code,
+.theme-mabinogi .code-block-wrapper pre,
+.theme-mabinogi #doc-content-textarea,
+.theme-mabinogi #doc-preview-panel code,
+.theme-mabinogi #doc-preview-panel pre {
+  color: #e8dfc8;
+  background: #1e1810 !important;
+}
+.theme-mabinogi .code-block-header { background: #1e1810; }
+.theme-mabinogi .code-block-header .code-lang { color: #a89878; }
+.theme-mabinogi .message-bubble code:not(.hljs) { color: #c87040; background: #1e1810; }
+/* Ensure hljs has visible colors on mabinogi */
+.theme-mabinogi .hljs { background: #1e1810 !important; color: #e8dfc8 !important; }
+.theme-mabinogi .hljs-keyword { color: #c87040; }
+.theme-mabinogi .hljs-string { color: #88b860; }
+.theme-mabinogi .hljs-comment { color: #a89878; }
+.theme-mabinogi .hljs-number { color: #d0a050; }
+.theme-mabinogi .hljs-function { color: #8ba8c8; }
+
+/* ─── Task 1.5: 3D CSS loading cube ────────────────── */
+.spinner-overlay {
+  background: var(--bg);
+}
+/* Hide the ASCII cube in favour of CSS 3D cube */
+#ascii-cube { display: none !important; }
+
+.css-cube-wrapper {
+  perspective: 200px;
+  width: 48px; height: 48px;
+  margin: 0 auto;
+}
+.css-cube {
+  width: 48px; height: 48px;
+  position: relative;
+  transform-style: preserve-3d;
+  animation: cssRotateCube 2s linear infinite;
+}
+@keyframes cssRotateCube {
+  0%   { transform: rotateX(0deg) rotateY(0deg); }
+  100% { transform: rotateX(360deg) rotateY(360deg); }
+}
+.css-cube-face {
+  position: absolute;
+  width: 48px; height: 48px;
+  border: 2px solid var(--red);
+  background: var(--accent-dim);
+  opacity: 0.85;
+}
+.css-cube-face.front  { transform: translateZ(24px); }
+.css-cube-face.back   { transform: rotateY(180deg) translateZ(24px); }
+.css-cube-face.left   { transform: rotateY(-90deg) translateZ(24px); }
+.css-cube-face.right  { transform: rotateY(90deg) translateZ(24px); }
+.css-cube-face.top    { transform: rotateX(90deg) translateZ(24px); }
+.css-cube-face.bottom { transform: rotateX(-90deg) translateZ(24px); }
+
+/* ─── Task 2.1: Focus Mode ──────────────────────────── */
+/* Buttons to toggle sidebar and chat history */
+#focus-mode-btns {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-top: 1px solid var(--border);
+  width: 100%;
+  flex-shrink: 0;
+}
+.focus-toggle-btn {
+  flex: 1; height: 32px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint); font-size: 11px;
+  transition: background 0.15s, color 0.15s;
+  background: none; border: 1px solid transparent;
+  cursor: pointer; font-family: inherit;
+}
+.focus-toggle-btn:hover { background: var(--panel2); color: var(--fg); }
+.focus-toggle-btn.active { background: var(--accent-dim); color: var(--red); border-color: var(--border); }
+
+/* Nav rail hidden state */
+#nav-rail.nav-hidden {
+  width: 0; min-width: 0; overflow: hidden; padding: 0; border: none;
+}
+/* Floating restore button when nav is hidden */
+#nav-restore-btn {
+  position: fixed; top: 50%; left: 6px; z-index: 300;
+  transform: translateY(-50%);
+  width: 22px; height: 44px; border-radius: 0 8px 8px 0;
+  background: var(--panel); border: 1px solid var(--border);
+  border-left: none; display: none;
+  align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 12px; cursor: pointer;
+  transition: background 0.15s;
+}
+#nav-restore-btn:hover { background: var(--panel2); color: var(--fg); }
+#nav-rail.nav-hidden ~ #nav-restore-btn { display: flex; }
+/* Simpler: use a sibling or body class */
+body.nav-rail-hidden #nav-restore-btn { display: flex; }
+body.nav-rail-hidden #nav-rail { width: 0; min-width: 0; overflow: hidden; padding: 0; border: none; }
+body.chat-sidebar-hidden #chat-sidebar { transform: translateX(-260px); width: 0; min-width: 0; }
+
+/* ─── Task 2.2: Expandable sidebar labels ────────────── */
+/* Nav rail expanded state — show labels */
+#nav-rail.expanded {
+  width: 160px; min-width: 160px;
+  align-items: flex-start;
+  padding: 10px 8px;
+}
+#nav-rail.expanded .nav-item {
+  width: 100%; justify-content: flex-start;
+  padding: 0 10px; gap: 10px; border-radius: 8px;
+}
+#nav-rail.expanded .nav-label { display: inline; font-size: 13px; font-weight: 500; white-space: nowrap; }
+#nav-rail.expanded .nav-group-label { display: block; font-size: 9px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 10px 2px; }
+#nav-rail.expanded #nav-logo { text-align: left; padding-left: 10px; font-size: 20px; }
+#nav-rail.expanded .nav-divider { width: calc(100% - 16px); margin: 4px 8px; }
+#nav-rail.expanded #nav-bottom { align-items: flex-start; padding: 8px; }
+#nav-rail.expanded .nav-user-avatar { margin-left: 4px; }
+#nav-rail.expanded .nav-collapse { align-items: flex-start; }
+#nav-rail.expanded .nav-sub-item { width: 100%; padding: 0 10px; }
+/* Expand toggle button */
+#nav-expand-btn {
+  position: absolute; bottom: 10px; right: -12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--panel); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; cursor: pointer; color: var(--text-muted);
+  z-index: 201; transition: background 0.15s; box-shadow: 0 2px 6px var(--shadow);
+}
+#nav-expand-btn:hover { background: var(--panel2); color: var(--fg); }
+#nav-rail { position: relative; }
+
+/* ─── Task 3.3: Model avatar tag in chat ─────────────── */
+.message-avatar .model-tag {
+  font-size: 9px;
+  padding: 2px 4px;
+}
+.message-row.assistant .message-avatar {
+  font-size: 11px;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Task 4.1: Documents section (was Library) ──────── */
+/* No CSS change needed — handled in HTML/JS */
+
+/* ─── Task 4.3: Notes WYSIWYG toolbar ───────────────── */
+#notes-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.notes-toolbar-btn {
+  width: 30px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700;
+  color: var(--text-muted); background: none;
+  border: 1px solid transparent;
+  cursor: pointer; font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+}
+.notes-toolbar-btn:hover { background: var(--panel2); color: var(--fg); border-color: var(--border); }
+.notes-toolbar-btn.active { background: var(--accent-dim); color: var(--red); border-color: var(--border); }
+.notes-toolbar-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
+.notes-toolbar-select {
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--fg); font-size: 11px; padding: 3px 6px; font-family: inherit;
+  cursor: pointer; outline: none;
+}
+
+/* Notes preview pane */
+#notes-preview-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.7;
+  background: var(--bg);
+  display: none;
+}
+#notes-preview-pane h1, #notes-preview-pane h2, #notes-preview-pane h3 { color: var(--red); margin: 16px 0 8px; }
+#notes-preview-pane p { margin-bottom: 10px; }
+#notes-preview-pane code { background: var(--code-bg); color: var(--red); padding: 1px 5px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.87em; }
+#notes-preview-pane pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; }
+
+/* Notes editor area flex layout */
+#notes-editor-panel {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+.notes-editor-body {
+  flex: 1; display: flex; overflow: hidden;
+}
+#note-content-textarea { flex: 1; }
+
+/* ─── Task 4.5: Export button styles ─────────────────── */
+#doc-export-btn {
+  padding: 4px 10px; font-size: 12px; border-radius: 6px;
+  background: var(--panel2); border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; font-family: inherit;
+  transition: all 0.12s;
+}
+#doc-export-btn:hover { border-color: var(--red); color: var(--red); }
+.export-menu {
+  position: absolute; right: 0; top: 100%; margin-top: 4px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 24px var(--shadow);
+  z-index: 600; min-width: 140px; overflow: hidden;
+}
+.export-menu-item {
+  padding: 9px 14px; font-size: 13px; cursor: pointer;
+  color: var(--fg); transition: background 0.1s;
+}
+.export-menu-item:hover { background: var(--panel2); color: var(--red); }
+
+/* ─── Task 4.6: Doc AI dropdown positioning fix ──────── */
+#doc-toolbar { position: relative; }
+#doc-ai-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 600;
+  min-width: 180px;
+}
+
+/* ─── Custom avatar in nav and chat ─────────────────── */
+.nav-user-avatar img,
+.message-avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover; border-radius: inherit;
+}
+.message-row.user .message-avatar {
+  overflow: hidden;
+}
+
+/* ─── Focus mode overlay fade ────────────────────────── */
+body.focus-mode #chat-sidebar {
+  transform: translateX(-260px); width: 0; min-width: 0;
+}
+body.focus-mode #nav-rail {
+  width: 0; min-width: 0; overflow: hidden; padding: 0; border: none;
+}
+body.focus-mode #nav-restore-btn { display: flex; }
+
+/* ─── Responsive: full-width Forge/Research on wide screens ── */
+@media (min-width: 1200px) {
+  #cookbook-header,
+  #forge-hardware-panel,
+  #forge-filter-bar {
+    padding-left: max(28px, calc((100% - 1100px)/2));
+    padding-right: max(28px, calc((100% - 1100px)/2));
+  }
+  #cookbook-model-list { padding-left: max(20px, calc((100% - 1100px)/2)); padding-right: max(20px, calc((100% - 1100px)/2)); }
+  #research-header, #agent-header { padding-left: max(28px, calc((100% - 900px)/2)); padding-right: max(28px, calc((100% - 900px)/2)); }
+  #research-report, #agent-messages { padding-left: max(28px, calc((100% - 860px)/2)); padding-right: max(28px, calc((100% - 860px)/2)); }
+  #research-input-row, #agent-input-row { padding-left: max(28px, calc((100% - 860px)/2)); padding-right: max(28px, calc((100% - 860px)/2)); }
+  #memory-header { padding-left: max(28px, calc((100% - 760px)/2)); padding-right: max(28px, calc((100% - 760px)/2)); }
+  #memory-list { padding-left: max(20px, calc((100% - 760px)/2)); padding-right: max(20px, calc((100% - 760px)/2)); }
+}

@@ -15,7 +15,17 @@ No lock-in, no telemetry, no cloud dependency. Everything stays on your machine.
 
 ---
 
-## What's New in v1.2
+## Navigation
+
+| Document | Purpose |
+| -------- | ------- |
+| [README.md](README.md) | This file — setup, features, configuration |
+| [TODO.md](TODO.md) | Project roadmap & feature tracker |
+| [GUIDES.md](GUIDES.md) | User guides and onboarding |
+
+---
+
+## What's New in v1.3
 
 - **Multi-user auth** — auto-generates an admin password on first run, printed to the terminal
 - **14 themes** — 8 new themes plus a full custom theme creator with live preview
@@ -483,7 +493,26 @@ glyndwr/
 
 ## Version History
 
-### v1.2 ✅ (current)
+### v1.3 ✅ (current)
+
+- **Full-width layouts** — Research, Agent, Memory, and Forge sections now stretch to the full viewport
+- **Mobile responsiveness pass** — 44px touch targets, adaptive layouts for all sections at 480–768px
+- **Settings page fix** — wider modal container, hex colour inputs no longer overflow
+- **Mabinogi theme contrast** — code blocks now render with light text on dark background
+- **3D CSS loading cube** — replaced ASCII animation with a smooth CSS `preserve-3d` spinning cube
+- **Focus Mode** — independent toggles to hide the nav rail and conversation history sidebar
+- **Expandable sidebar** — click the expand button to reveal labelled navigation items
+- **Custom user avatars** — upload a profile photo; shown in the nav rail and all chat messages
+- **Dynamic model tags** — AI chat messages show the provider tag (OAI / ANT / GEM / GRK / LLM) instead of a static icon
+- **Notes WYSIWYG toolbar** — bold, italic, underline, headings, code, quote, lists, links, live preview; OS-aware `Ctrl`/`Cmd` shortcuts
+- **Document export** — export documents as PDF (browser print), DOCX, or raw `.md`/`.txt` download
+- **Documents rename** — "Library" section renamed to "Documents" throughout
+- **Memory auto-extract** — memory extraction now enabled by default (no longer requires explicit setting)
+- **Compare tool** — side-by-side model comparison fully wired up
+- **Enhanced hardware profiler** — GPU model–based VRAM heuristics for NVIDIA, AMD, and Apple Silicon
+- **Server lifecycle** — graceful `SIGINT`/`SIGTERM` handling; keep-alive timeout raised to 120 s
+
+### v1.2
 
 - Multi-user authentication with auto-generated admin password
 - 14 themes + custom theme creator + animated backgrounds

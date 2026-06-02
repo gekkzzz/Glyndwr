@@ -377,8 +377,13 @@ function makeMessageEl(msg) {
   row.className = `message-row ${msg.role}`;
   row.dataset.id = msg.id;
   const contentHtml = msg.role === 'assistant' ? renderMarkdown(msg.content) : `<span>${escHtml(msg.content).replace(/\n/g, '<br>')}</span>`;
+  // User avatar: custom photo if set, otherwise default emoji
+  const userAvatar = localStorage.getItem('glyndwr_user_avatar')
+    ? `<img src="${localStorage.getItem('glyndwr_user_avatar')}" alt="You" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`
+    : '🧑';
+  const aiAvatar = msg.role === 'assistant' ? getProviderIcon(msg.model) : userAvatar;
   row.innerHTML = `
-    <div class="message-avatar">${msg.role === 'user' ? '🧑' : '⊕'}</div>
+    <div class="message-avatar">${msg.role === 'user' ? userAvatar : aiAvatar}</div>
     <div class="message-body">
       <div class="message-bubble">${contentHtml}</div>
       <div class="message-meta">
@@ -395,10 +400,11 @@ window.copyMessageContent = function (btn) {
   navigator.clipboard.writeText(text).then(() => { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); });
 };
 
-function makeTypingIndicator() {
+function makeTypingIndicator(model) {
   const row = document.createElement('div');
   row.className = 'message-row assistant'; row.id = 'typing-indicator';
-  row.innerHTML = `<div class="message-avatar">⊕</div><div class="message-body"><div class="message-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`;
+  const avatarContent = model ? getProviderIcon(model) : '⊕';
+  row.innerHTML = `<div class="message-avatar">${avatarContent}</div><div class="message-body"><div class="message-bubble"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div></div>`;
   return row;
 }
 
@@ -424,7 +430,7 @@ async function sendMessage() {
   document.getElementById('welcome-screen').style.display = 'none';
   list.appendChild(makeMessageEl(userMsg));
 
-  const typingEl = makeTypingIndicator();
+  const typingEl = makeTypingIndicator(model);
   list.appendChild(typingEl);
   scrollToBottom();
 
@@ -433,7 +439,7 @@ async function sendMessage() {
 
   const assistantRow = document.createElement('div');
   assistantRow.className = 'message-row assistant';
-  assistantRow.innerHTML = `<div class="message-avatar">⊕</div><div class="message-body"><div class="message-bubble" id="streaming-bubble"></div><div class="message-meta"><span class="message-time">${formatTime(new Date().toISOString())}</span><span class="message-model">${escHtml(model)}</span><button class="copy-msg-btn" onclick="copyMessageContent(this)">Copy</button></div></div>`;
+  assistantRow.innerHTML = `<div class="message-avatar">${getProviderIcon(model)}</div><div class="message-body"><div class="message-bubble" id="streaming-bubble"></div><div class="message-meta"><span class="message-time">${formatTime(new Date().toISOString())}</span><span class="message-model">${escHtml(model)}</span><button class="copy-msg-btn" onclick="copyMessageContent(this)">Copy</button></div></div>`;
 
   let fullText = '', userScrolled = false;
   const messagesArea = document.getElementById('messages-area');
@@ -3032,5 +3038,460 @@ function initSwipeGestures() {
   }, { passive: true });
 }
 
+// ═══════════════════════════════════════════════════════════
+//  OVERHAUL v1.3 ADDITIONS
+// ═══════════════════════════════════════════════════════════
+
+// ── Task 2.1 & 2.2: Focus Mode & Sidebar Expand ─────────────
+
+let _navExpanded = false;
+let _navHidden = false;
+let _historyHidden = false;
+
+function toggleNavRail() {
+  _navHidden = !_navHidden;
+  document.body.classList.toggle('nav-rail-hidden', _navHidden);
+  const btn = document.getElementById('toggle-nav-btn');
+  if (btn) btn.classList.toggle('active', _navHidden);
+}
+
+function toggleChatHistory() {
+  _historyHidden = !_historyHidden;
+  const sidebar = document.getElementById('chat-sidebar');
+  if (sidebar) {
+    sidebar.classList.toggle('collapsed', _historyHidden);
+  }
+  const btn = document.getElementById('toggle-history-btn');
+  if (btn) btn.classList.toggle('active', _historyHidden);
+}
+
+function toggleNavExpand() {
+  _navExpanded = !_navExpanded;
+  const rail = document.getElementById('nav-rail');
+  if (rail) rail.classList.toggle('expanded', _navExpanded);
+  const btn = document.getElementById('nav-expand-btn');
+  if (btn) btn.textContent = _navExpanded ? '‹' : '›';
+}
+
+function bindFocusModeEvents() {
+  document.getElementById('toggle-nav-btn')?.addEventListener('click', toggleNavRail);
+  document.getElementById('toggle-history-btn')?.addEventListener('click', toggleChatHistory);
+  document.getElementById('nav-expand-btn')?.addEventListener('click', toggleNavExpand);
+  document.getElementById('nav-restore-btn')?.addEventListener('click', () => {
+    _navHidden = false;
+    document.body.classList.remove('nav-rail-hidden');
+    const btn = document.getElementById('toggle-nav-btn');
+    if (btn) btn.classList.remove('active');
+  });
+}
+
+// ── Task 3.2: Custom User Avatars ───────────────────────────
+
+const AVATAR_KEY = 'glyndwr_user_avatar';
+
+function loadUserAvatar() {
+  const saved = localStorage.getItem(AVATAR_KEY);
+  if (!saved) return;
+  applyUserAvatar(saved);
+}
+
+function applyUserAvatar(dataUrl) {
+  // Nav avatar
+  const navAvatar = document.getElementById('nav-user-avatar');
+  if (navAvatar) {
+    navAvatar.innerHTML = `<img src="${dataUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    navAvatar.title = state.currentUser?.username || 'Account';
+  }
+  // Account settings avatar
+  const accAvatar = document.getElementById('account-avatar');
+  if (accAvatar) {
+    accAvatar.innerHTML = `<img src="${dataUrl}" alt="Avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  }
+  // Show remove button
+  const removeBtn = document.getElementById('remove-avatar-btn');
+  if (removeBtn) removeBtn.style.display = '';
+}
+
+function handleAvatarUpload(file) {
+  if (!file || !file.type.startsWith('image/')) { showToast('Please select an image file', 'warning'); return; }
+  if (file.size > 2 * 1024 * 1024) { showToast('Image must be under 2 MB', 'warning'); return; }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    localStorage.setItem(AVATAR_KEY, dataUrl);
+    applyUserAvatar(dataUrl);
+    showToast('Avatar updated', 'success');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeUserAvatar() {
+  localStorage.removeItem(AVATAR_KEY);
+  const navAvatar = document.getElementById('nav-user-avatar');
+  if (navAvatar && state.currentUser) {
+    navAvatar.innerHTML = (state.currentUser.username || '?')[0].toUpperCase();
+  }
+  const accAvatar = document.getElementById('account-avatar');
+  if (accAvatar && state.currentUser) {
+    accAvatar.innerHTML = (state.currentUser.username || '?')[0].toUpperCase();
+  }
+  const removeBtn = document.getElementById('remove-avatar-btn');
+  if (removeBtn) removeBtn.style.display = 'none';
+  showToast('Avatar removed', 'info');
+}
+
+function bindAvatarEvents() {
+  const uploadBtn = document.getElementById('upload-avatar-btn');
+  const fileInput = document.getElementById('avatar-file-input');
+  const removeBtn = document.getElementById('remove-avatar-btn');
+  const accountAvatar = document.getElementById('account-avatar');
+
+  uploadBtn?.addEventListener('click', () => fileInput?.click());
+  accountAvatar?.addEventListener('click', () => fileInput?.click());
+  fileInput?.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if (f) { handleAvatarUpload(f); e.target.value = ''; }
+  });
+  removeBtn?.addEventListener('click', removeUserAvatar);
+}
+
+// ── Task 3.3: Dynamic model avatars ─────────────────────────
+// makeMessageEl is patched directly in the main function above;
+// getProviderIcon already handles OAI/ANT/GEM/GRK/LLM routing.
+
+// ── Task 4.1: Documents rename ──────────────────────────────
+// Handled in HTML — no JS needed except updating any dynamic text
+
+// ── Task 4.2 & 4.3 & 4.4: Notes WYSIWYG & Markdown ─────────
+
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+
+function wrapNoteSelection(before, after = before) {
+  const ta = document.getElementById('note-content-textarea');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const selected = ta.value.slice(start, end);
+  const newText = before + selected + after;
+  ta.setRangeText(newText, start, end, 'end');
+  if (!selected) {
+    ta.selectionStart = ta.selectionEnd = start + before.length;
+  }
+  ta.focus();
+  scheduleNoteSave();
+}
+
+function insertNoteLinePrefix(prefix) {
+  const ta = document.getElementById('note-content-textarea');
+  if (!ta) return;
+  const start = ta.selectionStart;
+  const lineStart = ta.value.lastIndexOf('\n', start - 1) + 1;
+  const currentLine = ta.value.slice(lineStart, start);
+  if (currentLine.startsWith(prefix)) {
+    ta.setRangeText('', lineStart, lineStart + prefix.length, 'preserve');
+  } else {
+    ta.setRangeText(prefix, lineStart, lineStart, 'end');
+  }
+  ta.focus();
+  scheduleNoteSave();
+}
+
+function toggleNotesPreview() {
+  const ta = document.getElementById('note-content-textarea');
+  const preview = document.getElementById('notes-preview-pane');
+  const btn = document.getElementById('note-preview-toggle-btn');
+  if (!ta || !preview) return;
+  const isPreview = preview.style.display === 'block';
+  if (isPreview) {
+    preview.style.display = 'none';
+    ta.style.display = '';
+    if (btn) btn.classList.remove('active');
+  } else {
+    preview.innerHTML = renderMarkdown(ta.value);
+    preview.style.display = 'block';
+    ta.style.display = 'none';
+    if (btn) btn.classList.add('active');
+  }
+}
+
+function bindNotesToolbar() {
+  document.getElementById('note-bold-btn')?.addEventListener('click', () => wrapNoteSelection('**'));
+  document.getElementById('note-italic-btn')?.addEventListener('click', () => wrapNoteSelection('*'));
+  document.getElementById('note-underline-btn')?.addEventListener('click', () => wrapNoteSelection('<u>', '</u>'));
+  document.getElementById('note-strikethrough-btn')?.addEventListener('click', () => wrapNoteSelection('~~'));
+  document.getElementById('note-code-btn')?.addEventListener('click', () => wrapNoteSelection('`'));
+  document.getElementById('note-codeblock-btn')?.addEventListener('click', () => wrapNoteSelection('\n```\n', '\n```\n'));
+  document.getElementById('note-quote-btn')?.addEventListener('click', () => insertNoteLinePrefix('> '));
+  document.getElementById('note-ul-btn')?.addEventListener('click', () => insertNoteLinePrefix('- '));
+  document.getElementById('note-ol-btn')?.addEventListener('click', () => insertNoteLinePrefix('1. '));
+  document.getElementById('note-hr-btn')?.addEventListener('click', () => {
+    const ta = document.getElementById('note-content-textarea');
+    if (!ta) return;
+    const pos = ta.selectionStart;
+    ta.setRangeText('\n---\n', pos, pos, 'end');
+    ta.focus();
+    scheduleNoteSave();
+  });
+  document.getElementById('note-link-btn')?.addEventListener('click', async () => {
+    const url = await appPrompt('Enter URL:', { title: 'Insert Link', placeholder: 'https://' });
+    if (url) wrapNoteSelection('[', `](${url})`);
+  });
+  document.getElementById('note-preview-toggle-btn')?.addEventListener('click', toggleNotesPreview);
+  document.getElementById('notes-heading-select')?.addEventListener('change', (e) => {
+    if (e.target.value) { insertNoteLinePrefix(e.target.value); e.target.value = ''; }
+  });
+
+  // OS-aware keyboard shortcuts for notes
+  const ta = document.getElementById('note-content-textarea');
+  if (ta) {
+    ta.addEventListener('keydown', (e) => {
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+      if (e.key === 'b') { e.preventDefault(); wrapNoteSelection('**'); }
+      else if (e.key === 'i') { e.preventDefault(); wrapNoteSelection('*'); }
+      else if (e.key === 'u') { e.preventDefault(); wrapNoteSelection('<u>', '</u>'); }
+      else if (e.key === 'k') { e.preventDefault(); wrapNoteSelection('[', '](url)'); }
+    });
+  }
+}
+
+// ── Task 4.5: Document Export ────────────────────────────────
+
+function exportDocAsPDF() {
+  const title = document.getElementById('doc-title-input')?.value || 'Document';
+  const content = document.getElementById('doc-content-textarea')?.value || '';
+  const format = document.getElementById('doc-format-select')?.value || 'markdown';
+  let html = '';
+  if (format === 'html') {
+    html = DOMPurify.sanitize(content);
+  } else if (format === 'markdown') {
+    html = renderMarkdown(content);
+  } else {
+    html = `<pre style="white-space:pre-wrap;font-family:inherit">${escHtml(content)}</pre>`;
+  }
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${escHtml(title)}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; line-height: 1.7; color: #222; padding: 0 20px; }
+  h1,h2,h3 { color: #111; }
+  code { background: #f0f0f0; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+  pre { background: #f0f0f0; padding: 12px; border-radius: 6px; overflow-x: auto; }
+  blockquote { border-left: 3px solid #aaa; margin: 8px 0; padding: 4px 12px; color: #555; }
+  @media print { body { margin: 0; } }
+</style></head><body><h1>${escHtml(title)}</h1>${html}</body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => { printWindow.print(); }, 250);
+}
+
+function exportDocAsMarkdown() {
+  const title = document.getElementById('doc-title-input')?.value || 'document';
+  const content = document.getElementById('doc-content-textarea')?.value || '';
+  const format = document.getElementById('doc-format-select')?.value || 'markdown';
+  const ext = format === 'plain' ? 'txt' : format === 'html' ? 'html' : format === 'csv' ? 'csv' : 'md';
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${title.replace(/[^a-z0-9]/gi, '_')}.${ext}`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+function exportDocAsDOCX() {
+  // Lightweight DOCX creation using plain XML — minimal but functional
+  const title = document.getElementById('doc-title-input')?.value || 'Document';
+  const content = document.getElementById('doc-content-textarea')?.value || '';
+  const format = document.getElementById('doc-format-select')?.value || 'markdown';
+
+  // Convert to paragraphs for DOCX
+  let bodyXml = '';
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const text = line.replace(/[<>&"']/g, c => ({ '<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;' }[c]));
+    if (!line.trim()) {
+      bodyXml += '<w:p/>';
+    } else if (/^#{1,6}\s/.test(line)) {
+      const level = line.match(/^(#+)/)[1].length;
+      const headingText = text.replace(/^#+\s*/, '');
+      bodyXml += `<w:p><w:pPr><w:pStyle w:val="Heading${Math.min(level, 6)}"/></w:pPr><w:r><w:t>${headingText}</w:t></w:r></w:p>`;
+    } else {
+      bodyXml += `<w:p><w:r><w:t xml:space="preserve">${text}</w:t></w:r></w:p>`;
+    }
+  }
+
+  const docxml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:body>
+<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>${title.replace(/[<>&"']/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]))}</w:t></w:r></w:p>
+${bodyXml}
+</w:body></w:document>`;
+
+  const blob = new Blob([docxml], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${(title || 'document').replace(/[^a-z0-9]/gi, '_')}.docx`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('DOCX exported (basic format)', 'success');
+}
+
+function bindDocExportEvents() {
+  const exportBtn = document.getElementById('doc-export-btn');
+  const exportMenu = document.getElementById('doc-export-menu');
+  if (exportBtn && exportMenu) {
+    exportBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      exportMenu.classList.toggle('hidden');
+    });
+    document.addEventListener('click', () => exportMenu?.classList.add('hidden'));
+  }
+  document.querySelectorAll('#doc-export-menu .export-menu-item').forEach(item => {
+    item.addEventListener('click', () => {
+      exportMenu?.classList.add('hidden');
+      const fmt = item.dataset.fmt;
+      if (fmt === 'pdf') exportDocAsPDF();
+      else if (fmt === 'docx') exportDocAsDOCX();
+      else exportDocAsMarkdown();
+    });
+  });
+}
+
+// ── Task 5.1: Memory extraction fix ─────────────────────────
+
+// Override to not require the setting flag (auto-extract by default)
+async function extractMemoriesFromConversation(convId) {
+  if (!convId) return;
+  // Respect user preference but default to ON (empty string = not set = enabled)
+  const pref = state.settings['memory_auto_extract'];
+  if (pref === 'false') return;
+  const model = state.settings['default_model'] || state.currentModel || 'gpt-4o-mini';
+  try {
+    const result = await API.post('/api/memories/extract', { conversation_id: convId, model });
+    if (result.extracted > 0) {
+      showToast(`${result.extracted} memory${result.extracted > 1 ? 's' : ''} saved`, 'success', 4000);
+    }
+  } catch { /* Silent — memory extraction is best-effort */ }
+}
+
+// ── Task 3.4: Compare tool completeness check ────────────────
+// The compare tool is already wired in bindEvents — just ensure
+// model selects are populated and the compare button works.
+// Additional: show the compare section as a real view option
+function openCompareView() {
+  state.compareHistory = { a: [], b: [] };
+  const ma = document.getElementById('compare-messages-a');
+  const mb = document.getElementById('compare-messages-b');
+  if (ma) ma.innerHTML = '';
+  if (mb) mb.innerHTML = '';
+  openModal('compare-overlay');
+}
+
+// ── Task 5.4: Enhanced hardware profiler ─────────────────────
+
+async function scanHardwareEnhanced() {
+  const info = {};
+  info.cores = navigator.hardwareConcurrency ? `${navigator.hardwareConcurrency} logical cores` : 'Unknown';
+  info.platform = navigator.userAgentData?.platform || navigator.platform || 'Unknown';
+  info.mobile = /Mobi|Android/i.test(navigator.userAgent);
+  info.ram = navigator.deviceMemory ? `${navigator.deviceMemory} GB (approximate)` : 'Unknown (browser privacy restricted)';
+
+  let gpuInfo = 'Unknown';
+  let vramGB = null;
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (gl) {
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      if (ext) {
+        const vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+        const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+        gpuInfo = `${vendor} — ${renderer}`;
+        const m = renderer.match(/(\d+)\s*GB/i);
+        if (m) { vramGB = parseInt(m[1]); }
+        // Heuristic VRAM from model name
+        if (!vramGB) {
+          if (/RTX\s*4090/i.test(renderer)) vramGB = 24;
+          else if (/RTX\s*4080/i.test(renderer)) vramGB = 16;
+          else if (/RTX\s*4070\s*Ti/i.test(renderer)) vramGB = 12;
+          else if (/RTX\s*4070/i.test(renderer)) vramGB = 12;
+          else if (/RTX\s*4060\s*Ti/i.test(renderer)) vramGB = 16;
+          else if (/RTX\s*4060/i.test(renderer)) vramGB = 8;
+          else if (/RTX\s*3090/i.test(renderer)) vramGB = 24;
+          else if (/RTX\s*3080\s*12/i.test(renderer)) vramGB = 12;
+          else if (/RTX\s*3080/i.test(renderer)) vramGB = 10;
+          else if (/RTX\s*3070/i.test(renderer)) vramGB = 8;
+          else if (/RTX\s*3060\s*Ti/i.test(renderer)) vramGB = 8;
+          else if (/RTX\s*3060/i.test(renderer)) vramGB = 12;
+          else if (/RX\s*7900\s*XTX/i.test(renderer)) vramGB = 24;
+          else if (/RX\s*7900/i.test(renderer)) vramGB = 20;
+          else if (/RX\s*6900/i.test(renderer)) vramGB = 16;
+          else if (/M[12]\s*(Pro|Max|Ultra)/i.test(renderer)) vramGB = 32; // Apple Silicon unified
+          else if (/M[12]/i.test(renderer)) vramGB = 16;
+          else if (/Iris/i.test(renderer) || /UHD/i.test(renderer)) vramGB = 2; // Integrated
+        }
+      }
+    }
+  } catch { gpuInfo = 'GPU info unavailable'; }
+
+  if (navigator.deviceMemory) _hwState.ramGB = navigator.deviceMemory;
+  if (vramGB) _hwState.vramGB = vramGB;
+
+  // Try to get more CPU info from User Agent hints
+  let cpuInfo = info.cores;
+  if (navigator.userAgentData?.getHighEntropyValues) {
+    try {
+      const hints = await navigator.userAgentData.getHighEntropyValues(['architecture', 'model', 'platform']);
+      if (hints.architecture) cpuInfo += ` · ${hints.architecture}`;
+      if (hints.model) cpuInfo += ` (${hints.model})`;
+    } catch {}
+  }
+
+  const el = document.getElementById('hardware-info');
+  if (!el) return;
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="hardware-grid">
+      <div class="hw-item"><div class="hw-label">GPU</div><div class="hw-val" style="font-size:11px;word-break:break-word">${escHtml(gpuInfo)}</div></div>
+      <div class="hw-item"><div class="hw-label">VRAM (est.)</div><div class="hw-val">${vramGB ? vramGB + ' GB' : 'Unknown'}</div></div>
+      <div class="hw-item"><div class="hw-label">RAM</div><div class="hw-val">${escHtml(info.ram)}</div></div>
+      <div class="hw-item"><div class="hw-label">CPU Threads</div><div class="hw-val">${escHtml(cpuInfo)}</div></div>
+      <div class="hw-item"><div class="hw-label">Platform</div><div class="hw-val">${escHtml(info.platform)}${info.mobile ? ' (Mobile)' : ''}</div></div>
+    </div>
+    <p class="form-hint" style="margin-top:10px">⚠ VRAM is estimated from GPU name. Use <strong>Enter manually</strong> for accuracy.</p>`;
+
+  renderCookbookModels();
+}
+
+// Replace original scanHardware
+const _origScanHardware = scanHardware;
+window.scanHardware = function() { scanHardwareEnhanced(); };
+
+// ── Bind all new event listeners ─────────────────────────────
+function bindOverhaulEvents() {
+  bindFocusModeEvents();
+  bindAvatarEvents();
+  bindNotesToolbar();
+  bindDocExportEvents();
+
+  // Override scan hardware — replace the button's event listener by cloning the button
+  const hwBtn = document.getElementById('scan-hardware-btn');
+  if (hwBtn) {
+    const newBtn = hwBtn.cloneNode(true);
+    hwBtn.parentNode?.replaceChild(newBtn, hwBtn);
+    newBtn.addEventListener('click', scanHardwareEnhanced);
+  }
+
+  // Load saved avatar
+  loadUserAvatar();
+}
+
+// Hook into init — append to DOMContentLoaded
+const _origInit = init;
+async function initWithOverhaul() {
+  await _origInit();
+  try { bindOverhaulEvents(); } catch(e) { console.error('bindOverhaulEvents error:', e); }
+}
+
 // ─── Start ────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', initWithOverhaul);

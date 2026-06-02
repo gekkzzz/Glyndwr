@@ -19,43 +19,25 @@
 
 <!-- Loading Screen -->
 <div class="spinner-overlay" id="app-spinner">
-  <div style="text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px;">
+  <div style="text-align:center; display:flex; flex-direction:column; align-items:center; gap:20px;">
     <pre style="color:var(--red); line-height:1.25; font-size:13px; font-family:inherit; margin:0; user-select:none">    /\        /\
    /  \  /\  /  \
   / /\ \/  \/ /\ \
  /_/  \_\  /_/  \_\</pre>
     <div style="color:var(--fg); font-size:15px; font-weight:700; letter-spacing:0.35em;">GLYNDWR</div>
-    <pre id="ascii-cube" style="color:var(--red); font-family:inherit; font-size:12px; line-height:1.3; margin:0; user-select:none"></pre>
+    <div class="css-cube-wrapper">
+      <div class="css-cube">
+        <div class="css-cube-face front"></div>
+        <div class="css-cube-face back"></div>
+        <div class="css-cube-face left"></div>
+        <div class="css-cube-face right"></div>
+        <div class="css-cube-face top"></div>
+        <div class="css-cube-face bottom"></div>
+      </div>
+    </div>
     <div style="color:var(--text-muted); font-size:12px; letter-spacing:0.12em;">loading workspace...</div>
   </div>
 </div>
-<script>
-(function() {
-  const frames = [
-    "  +-------+\n |       |\n |       |\n +-------+",
-    "  +-------+\n  \\       \\\n   \\       \\\n    +-------+",
-    "  +-------+\n /       /\n/       /\n+-------+",
-    "  +-------+\n |       |\n |       |\n +-------+",
-  ];
-  const cube3d = [
-    "    +----+\n   /|   /|\n  +----+ |\n  | +--|-+\n  |/   |/\n  +----+",
-    "    +----+\n   /|   /|\n  +----+ |\n  | +--|-+\n  |/   |/\n  +----+",
-    "   +----+\n  /|   /|\n +----+ |\n | +--|-+\n |/   |/\n +----+",
-    "  +----+\n /|   /|\n+----+ |\n| +--|-+\n|/   |/\n+----+",
-    "  +----+\n /|   /|\n+----+ |\n| +--|-+\n|/   |/\n+----+",
-    "   +----+\n  /|   /|\n +----+ |\n | +--|-+\n |/   |/\n +----+",
-  ];
-  let f = 0;
-  const el = document.getElementById('ascii-cube');
-  if (!el) return;
-  el.textContent = cube3d[0];
-  const iv = setInterval(() => {
-    f = (f + 1) % cube3d.length;
-    if (el.isConnected) el.textContent = cube3d[f];
-    else clearInterval(iv);
-  }, 120);
-})();
-</script>
 
 <div id="app">
 
@@ -78,9 +60,9 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span class="nav-label">Tasks</span>
       </button>
-      <button class="nav-item" data-section="documents" title="Library">
+      <button class="nav-item" data-section="documents" title="Documents">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-        <span class="nav-label">Library</span>
+        <span class="nav-label">Documents</span>
       </button>
       <button class="nav-item" data-section="gallery" title="Gallery">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -119,6 +101,14 @@
       </div>
 
     </div>
+    <div id="focus-mode-btns">
+      <button class="focus-toggle-btn" id="toggle-nav-btn" title="Toggle navigation">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="4" height="18" rx="1"/><line x1="10" y1="3" x2="21" y2="3"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="21" x2="21" y2="21"/></svg>
+      </button>
+      <button class="focus-toggle-btn" id="toggle-history-btn" title="Toggle chat history">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+    </div>
     <div id="nav-bottom">
       <div class="nav-user-avatar" id="nav-user-avatar" title="Account">?</div>
       <button class="nav-item" id="nav-settings-btn" title="Settings">
@@ -127,6 +117,10 @@
       </button>
     </div>
   </nav>
+
+  <!-- Nav expand/restore controls -->
+  <button id="nav-expand-btn" title="Expand sidebar">›</button>
+  <button id="nav-restore-btn" title="Restore navigation">›</button>
 
   <!-- ── CHAT SECTION ─────────────────────────────────────── -->
   <section id="section-chat" class="section active">
@@ -308,7 +302,36 @@
       <div id="notes-editor-header">
         <input type="text" id="note-title-input" placeholder="Note title…" />
       </div>
-      <textarea id="note-content-textarea" placeholder="Start writing… (Markdown supported)"></textarea>
+      <!-- WYSIWYG Toolbar -->
+      <div id="notes-toolbar">
+        <select class="notes-toolbar-select" id="notes-heading-select" title="Heading level">
+          <option value="">Normal</option>
+          <option value="# ">H1</option>
+          <option value="## ">H2</option>
+          <option value="### ">H3</option>
+        </select>
+        <div class="notes-toolbar-sep"></div>
+        <button class="notes-toolbar-btn" id="note-bold-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button class="notes-toolbar-btn" id="note-italic-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button class="notes-toolbar-btn" id="note-underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button class="notes-toolbar-btn" id="note-strikethrough-btn" title="Strikethrough"><s>S</s></button>
+        <div class="notes-toolbar-sep"></div>
+        <button class="notes-toolbar-btn" id="note-code-btn" title="Inline code">&#60;/&#62;</button>
+        <button class="notes-toolbar-btn" id="note-codeblock-btn" title="Code block" style="font-size:10px;width:36px">```</button>
+        <button class="notes-toolbar-btn" id="note-quote-btn" title="Blockquote">"</button>
+        <div class="notes-toolbar-sep"></div>
+        <button class="notes-toolbar-btn" id="note-ul-btn" title="Bullet list">• ≡</button>
+        <button class="notes-toolbar-btn" id="note-ol-btn" title="Numbered list">1.</button>
+        <button class="notes-toolbar-btn" id="note-hr-btn" title="Horizontal rule">—</button>
+        <div class="notes-toolbar-sep"></div>
+        <button class="notes-toolbar-btn" id="note-link-btn" title="Insert link">🔗</button>
+        <div style="flex:1"></div>
+        <button class="notes-toolbar-btn" id="note-preview-toggle-btn" title="Toggle preview">👁</button>
+      </div>
+      <div class="notes-editor-body">
+        <textarea id="note-content-textarea" placeholder="Start writing… (Markdown supported)"></textarea>
+        <div id="notes-preview-pane"></div>
+      </div>
       <div id="notes-editor-footer">
         <span id="note-save-status" class="text-muted"></span>
         <button class="btn btn-danger btn-sm" id="delete-note-btn" style="display:none">Delete note</button>
@@ -341,7 +364,7 @@
   <section id="section-documents" class="section">
     <div id="doc-list-panel">
       <div class="panel-header">
-        <span class="panel-title">Library</span>
+        <span class="panel-title">Documents</span>
         <button class="panel-action-btn" id="new-doc-btn" title="New document">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -386,6 +409,15 @@
               <option value="csv">CSV</option>
               <option value="plain">Plain Text</option>
             </select>
+            <div style="position:relative;display:inline-block">
+              <button id="doc-export-btn" title="Export document">Export ▾</button>
+              <div class="export-menu hidden" id="doc-export-menu">
+                <div class="export-menu-item" data-fmt="pdf">📄 Export as PDF</div>
+                <div class="export-menu-item" data-fmt="docx">📝 Export as DOCX</div>
+                <div class="export-menu-item" data-fmt="md">⬇ Download .md</div>
+                <div class="export-menu-item" data-fmt="txt">⬇ Download .txt</div>
+              </div>
+            </div>
             <button class="btn btn-secondary btn-sm" id="doc-ai-btn">AI ▾</button>
             <div id="doc-ai-menu" class="dropdown-menu hidden">
               <div class="dropdown-item" data-action="improve">✦ Improve writing</div>
@@ -1055,10 +1087,15 @@
       <!-- Account -->
       <div class="modal-tab-content" id="tab-account">
         <div class="account-info-card" id="account-info-card">
-          <div class="account-avatar-large" id="account-avatar">?</div>
+          <div class="account-avatar-large" id="account-avatar" style="cursor:pointer;position:relative;overflow:hidden" title="Click to change avatar">?</div>
           <div class="account-meta">
             <div class="account-username" id="account-username">Loading…</div>
             <div class="account-role">Role: <span class="role-badge" id="account-role-badge">user</span></div>
+            <div style="margin-top:6px;display:flex;gap:6px;align-items:center">
+              <button class="btn btn-secondary btn-sm" id="upload-avatar-btn">Upload Photo</button>
+              <button class="btn btn-secondary btn-sm" id="remove-avatar-btn" style="display:none">Remove</button>
+              <input type="file" id="avatar-file-input" accept="image/*" hidden />
+            </div>
           </div>
           <button class="btn btn-danger btn-sm" id="logout-btn">Sign Out</button>
         </div>

@@ -7,11 +7,12 @@
 
 ---
 
-## 🎨 1. Layout & UI Polish
+## 🎨 1. Layout, UI Polish & Mobile Optimization
 
 | Status | Feature | Description |
 | :---: | :--- | :--- |
 | 🚧 | **Page Stretching** | Fix layout of **Deep Research, Agents, Memory, and Forge** sections. Headers must span full width; remove horizontal squishing for a responsive design. |
+| ⬜ | **Mobile-Friendly Responsiveness** | Audit and update the global CSS/layout system to ensure the entire application scales beautifully down to mobile viewport sizes. Optimize touch targets, fix overflow issues, and ensure a seamless mobile browsing experience. |
 | ⬜ | **Settings Page Cleanup** | Fix alignment issues (e.g., hex color input spilling out of picker). Widen the settings container to prevent element overlapping. |
 | ⬜ | **Theme Visibility Audit** | Audit all themes for text-contrast bugs. Fix the **Mabinogi theme** (dark text on dark backgrounds in code blocks) to ensure global readability. |
 | ⬜ | **Loading Animation** | Replace the legacy spinning square with a modern **3D spinning cube** animation. |
@@ -44,7 +45,8 @@
 | :---: | :--- | :--- |
 | ⬜ | **Rename "Library" to "Documents"** | Update all references, section headers, and associated iconography/emojis. |
 | ⬜ | **Markdown Auto-Rendering (Notes)** | Instantly render markdown syntax (`##`, `**`, `*`) into stylized rich text within the **Notes** section. |
-| ⬜ | **Editor Keyboard Shortcuts** | Implement native hotkeys (e.g., `Ctrl+B` / `Cmd+B` for bolding text) across `.md` and `.txt` file types in **Documents**. |
+| ⬜ | **WYSIWYG Editing Toolbar** | Add an interactive rich-text formatting toolbar (Bold, Italics, etc.) directly in the browser interface. This allows desktop users to format text by clicking options like in Microsoft Word, and provides crucial editing capabilities for mobile users. |
+| ⬜ | **OS-Aware Cross-Compatibility** | Implement user-agent/OS detection so editor keyboard shortcuts dynamically adjust based on the user's operating system (e.g., automatically listening for `Cmd + B` on macOS/iOS and `Ctrl + B` on Windows/Linux/Android). |
 | ⬜ | **Document Export Engine** | Add formatting pipeline to export documents directly to **PDF** and **DOCX**. |
 | ⬜ | **AI Dropdown Menu Fix** | Fix the UI component bug restricting available options in the Notes dropdown menu. |
 

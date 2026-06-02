@@ -81,22 +81,29 @@
       <div class="nav-divider"></div>
       <button class="nav-item" id="nav-tools-toggle" title="Tools">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span class="nav-label">Tools</span>
+        <svg class="nav-tools-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div id="nav-tools-collapse" class="nav-collapse">
         <button class="nav-item nav-sub-item" data-section="agent" title="Agent">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="3"/><path d="M12 8v3"/></svg>
+          <span class="nav-label">Agent</span>
         </button>
         <button class="nav-item nav-sub-item" data-section="research" title="Deep Research">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span class="nav-label">Research</span>
         </button>
         <button class="nav-item nav-sub-item" data-section="memory" title="Memory">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span class="nav-label">Memory</span>
         </button>
         <button class="nav-item nav-sub-item" data-section="cookbook" title="Forge">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span class="nav-label">Forge</span>
         </button>
         <button class="nav-item nav-sub-item" id="compare-nav-btn" title="Compare">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>
+          <span class="nav-label">Compare</span>
         </button>
       </div>
 
@@ -109,6 +116,8 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
       </button>
     </div>
+    <!-- Drag-to-resize handle -->
+    <div id="nav-resize-handle"></div>
     <div id="nav-bottom">
       <div class="nav-user-avatar" id="nav-user-avatar" title="Account">?</div>
       <button class="nav-item" id="nav-settings-btn" title="Settings">
@@ -118,8 +127,7 @@
     </div>
   </nav>
 
-  <!-- Nav expand/restore controls -->
-  <button id="nav-expand-btn" title="Expand sidebar">›</button>
+  <!-- Floating restore button shown when nav is hidden -->
   <button id="nav-restore-btn" title="Restore navigation">›</button>
 
   <!-- ── CHAT SECTION ─────────────────────────────────────── -->
@@ -409,7 +417,7 @@
               <option value="csv">CSV</option>
               <option value="plain">Plain Text</option>
             </select>
-            <div style="position:relative;display:inline-block">
+            <div class="doc-dropdown-wrap">
               <button id="doc-export-btn" title="Export document">Export ▾</button>
               <div class="export-menu hidden" id="doc-export-menu">
                 <div class="export-menu-item" data-fmt="pdf">📄 Export as PDF</div>
@@ -418,19 +426,39 @@
                 <div class="export-menu-item" data-fmt="txt">⬇ Download .txt</div>
               </div>
             </div>
-            <button class="btn btn-secondary btn-sm" id="doc-ai-btn">AI ▾</button>
-            <div id="doc-ai-menu" class="dropdown-menu hidden">
-              <div class="dropdown-item" data-action="improve">✦ Improve writing</div>
-              <div class="dropdown-item" data-action="summarize">∑ Summarize</div>
-              <div class="dropdown-item" data-action="expand">↗ Expand</div>
-              <div class="dropdown-item" data-action="fix_grammar">✓ Fix grammar</div>
-              <div class="dropdown-item" data-action="explain">? Explain</div>
-              <div class="dropdown-item" data-action="translate">⇄ Translate</div>
+            <div class="doc-dropdown-wrap">
+              <button class="btn btn-secondary btn-sm" id="doc-ai-btn">AI ▾</button>
+              <div id="doc-ai-menu" class="dropdown-menu hidden">
+                <div class="dropdown-item" data-action="summarize">∑ Summarize Document</div>
+                <div class="dropdown-item" data-action="explain">? Explain Concepts</div>
+                <div class="dropdown-item" data-action="fix_grammar">✓ Fix Grammar/Style</div>
+                <div class="dropdown-item" data-action="improve">✦ Improve Writing</div>
+                <div class="dropdown-item" data-action="expand">↗ Expand</div>
+                <div class="dropdown-item" data-action="translate">⇄ Translate</div>
+              </div>
             </div>
             <button class="btn btn-danger btn-sm" id="delete-doc-btn" style="display:none" title="Delete document">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>
             </button>
           </div>
+        </div>
+        <!-- WYSIWYG formatting toolbar -->
+        <div id="doc-wysiwyg-toolbar">
+          <select class="notes-toolbar-select" id="doc-heading-select" title="Heading level">
+            <option value="">Normal</option>
+            <option value="h1">H1</option>
+            <option value="h2">H2</option>
+            <option value="h3">H3</option>
+          </select>
+          <div class="notes-toolbar-sep"></div>
+          <button class="notes-toolbar-btn" id="doc-bold-btn" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button class="notes-toolbar-btn" id="doc-italic-btn" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button class="notes-toolbar-btn" id="doc-underline-btn" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button class="notes-toolbar-btn" id="doc-strike-btn" title="Strikethrough"><s>S</s></button>
+          <div class="notes-toolbar-sep"></div>
+          <button class="notes-toolbar-btn" id="doc-code-btn" title="Inline code" style="font-size:10px;width:36px">&lt;/&gt;</button>
+          <div style="flex:1"></div>
+          <span id="doc-format-hint" class="doc-format-badge"></span>
         </div>
         <div id="doc-statusbar">
           <span id="doc-save-status" class="text-muted"></span>

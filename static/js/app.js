@@ -2397,7 +2397,8 @@ function bindEvents() {
     document.getElementById('doc-ai-menu').classList.toggle('hidden');
   });
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('#doc-ai-btn')) document.getElementById('doc-ai-menu')?.classList.add('hidden');
+    if (!e.target.closest('#doc-ai-btn') && !e.target.closest('#doc-ai-menu'))
+      document.getElementById('doc-ai-menu')?.classList.add('hidden');
     if (!e.target.closest('#context-menu')) hideContextMenu();
   });
   document.querySelectorAll('#doc-ai-menu .dropdown-item').forEach(item => {
@@ -3042,11 +3043,25 @@ function initSwipeGestures() {
 //  OVERHAUL v1.3 ADDITIONS
 // ═══════════════════════════════════════════════════════════
 
-// ── Task 2.1 & 2.2: Focus Mode & Sidebar Expand ─────────────
+// ── Focus Mode, Sidebar Expand & Drag-to-Resize ─────────────
 
-let _navExpanded = false;
+const NAV_MIN_W = 56, NAV_MAX_W = 300, NAV_LABELS_THRESHOLD = 80;
+let _navWidth = Math.max(NAV_MIN_W, Math.min(NAV_MAX_W,
+  parseInt(localStorage.getItem('glyndwr_nav_width') || '56', 10)));
 let _navHidden = false;
 let _historyHidden = false;
+
+function updateNavWidth(w, persist = true) {
+  w = Math.round(Math.max(NAV_MIN_W, Math.min(NAV_MAX_W, w)));
+  _navWidth = w;
+  const rail = document.getElementById('nav-rail');
+  if (!rail) return;
+  rail.style.setProperty('--nav-rail-width', w + 'px');
+  const wide = w > NAV_LABELS_THRESHOLD;
+  rail.classList.toggle('expanded', wide);
+  rail.classList.toggle('labels-visible', wide);
+  if (persist) localStorage.setItem('glyndwr_nav_width', String(w));
+}
 
 function toggleNavRail() {
   _navHidden = !_navHidden;
@@ -3058,31 +3073,57 @@ function toggleNavRail() {
 function toggleChatHistory() {
   _historyHidden = !_historyHidden;
   const sidebar = document.getElementById('chat-sidebar');
-  if (sidebar) {
-    sidebar.classList.toggle('collapsed', _historyHidden);
-  }
+  if (sidebar) sidebar.classList.toggle('collapsed', _historyHidden);
   const btn = document.getElementById('toggle-history-btn');
   if (btn) btn.classList.toggle('active', _historyHidden);
 }
 
-function toggleNavExpand() {
-  _navExpanded = !_navExpanded;
+function initNavRailResize() {
+  const handle = document.getElementById('nav-resize-handle');
   const rail = document.getElementById('nav-rail');
-  if (rail) rail.classList.toggle('expanded', _navExpanded);
-  const btn = document.getElementById('nav-expand-btn');
-  if (btn) btn.textContent = _navExpanded ? '‹' : '›';
+  if (!handle || !rail) return;
+
+  // Apply persisted width on load
+  updateNavWidth(_navWidth, false);
+
+  let startX = 0, startW = 0;
+
+  function onPointerMove(e) {
+    const newW = startW + (e.clientX - startX);
+    updateNavWidth(newW, false);
+  }
+
+  function onPointerUp() {
+    rail.classList.remove('is-dragging');
+    handle.classList.remove('active');
+    localStorage.setItem('glyndwr_nav_width', String(_navWidth));
+    document.removeEventListener('pointermove', onPointerMove);
+    document.removeEventListener('pointerup', onPointerUp);
+  }
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = _navWidth;
+    rail.classList.add('is-dragging');
+    handle.classList.add('active');
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+  });
 }
 
 function bindFocusModeEvents() {
   document.getElementById('toggle-nav-btn')?.addEventListener('click', toggleNavRail);
   document.getElementById('toggle-history-btn')?.addEventListener('click', toggleChatHistory);
-  document.getElementById('nav-expand-btn')?.addEventListener('click', toggleNavExpand);
   document.getElementById('nav-restore-btn')?.addEventListener('click', () => {
     _navHidden = false;
     document.body.classList.remove('nav-rail-hidden');
     const btn = document.getElementById('toggle-nav-btn');
     if (btn) btn.classList.remove('active');
+    // Re-apply width so the rail snaps back to its saved size
+    updateNavWidth(_navWidth, false);
   });
+  initNavRailResize();
 }
 
 // ── Task 3.2: Custom User Avatars ───────────────────────────
@@ -3344,7 +3385,12 @@ function bindDocExportEvents() {
       e.stopPropagation();
       exportMenu.classList.toggle('hidden');
     });
-    document.addEventListener('click', () => exportMenu?.classList.add('hidden'));
+    // mousedown on items fires before the blur close — prevent race
+    exportMenu.addEventListener('mousedown', (e) => e.stopPropagation());
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#doc-export-btn') && !e.target.closest('#doc-export-menu'))
+        exportMenu?.classList.add('hidden');
+    });
   }
   document.querySelectorAll('#doc-export-menu .export-menu-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -3473,6 +3519,7 @@ function bindOverhaulEvents() {
   bindAvatarEvents();
   bindNotesToolbar();
   bindDocExportEvents();
+  bindDocToolbar();
 
   // Override scan hardware — replace the button's event listener by cloning the button
   const hwBtn = document.getElementById('scan-hardware-btn');
@@ -3491,6 +3538,234 @@ const _origInit = init;
 async function initWithOverhaul() {
   await _origInit();
   try { bindOverhaulEvents(); } catch(e) { console.error('bindOverhaulEvents error:', e); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  DOCUMENT WYSIWYG TOOLBAR & MULTI-FORMAT TRANSCRIPTION ENGINE
+// ═══════════════════════════════════════════════════════════
+
+// Detect active document format from the format select dropdown
+function _getDocFormat() {
+  return (document.getElementById('doc-format-select')?.value || 'markdown').toLowerCase();
+}
+
+// Returns format-specific syntax tokens for a given style
+// Returns { open, close } pair and whether to use line-level prefix (for headings)
+function _getFormatTokens(style, fmt) {
+  switch (fmt) {
+    case 'html':
+      switch (style) {
+        case 'bold':        return { open: '<strong>', close: '</strong>', line: false };
+        case 'italic':      return { open: '<em>', close: '</em>', line: false };
+        case 'underline':   return { open: '<u>', close: '</u>', line: false };
+        case 'strike':      return { open: '<s>', close: '</s>', line: false };
+        case 'code':        return { open: '<code>', close: '</code>', line: false };
+        case 'h1':          return { open: '<h1>', close: '</h1>', line: true };
+        case 'h2':          return { open: '<h2>', close: '</h2>', line: true };
+        case 'h3':          return { open: '<h3>', close: '</h3>', line: true };
+      }
+      break;
+    case 'csv':
+      // Keep formatting inside the selected cell value; use Markdown-style markers
+      switch (style) {
+        case 'bold':      return { open: '**', close: '**', line: false };
+        case 'italic':    return { open: '*', close: '*', line: false };
+        case 'underline': return { open: '__', close: '__', line: false };
+        case 'strike':    return { open: '~~', close: '~~', line: false };
+        case 'code':      return { open: '`', close: '`', line: false };
+        // Headings don't make sense inside CSV cells — no-op markers
+        default:          return { open: '', close: '', line: false };
+      }
+    case 'plain':
+      // Plain text: uppercase delimiters for bold, slashes for italic, etc.
+      switch (style) {
+        case 'bold':      return { open: '**', close: '**', line: false };
+        case 'italic':    return { open: '_', close: '_', line: false };
+        case 'underline': return { open: '_', close: '_', line: false };
+        case 'strike':    return { open: '~~', close: '~~', line: false };
+        case 'code':      return { open: '`', close: '`', line: false };
+        case 'h1':        return { open: '# ', close: '', line: true };
+        case 'h2':        return { open: '## ', close: '', line: true };
+        case 'h3':        return { open: '### ', close: '', line: true };
+      }
+      break;
+    // markdown (default)
+    default:
+      switch (style) {
+        case 'bold':      return { open: '**', close: '**', line: false };
+        case 'italic':    return { open: '*', close: '*', line: false };
+        case 'underline': return { open: '<u>', close: '</u>', line: false };
+        case 'strike':    return { open: '~~', close: '~~', line: false };
+        case 'code':      return { open: '`', close: '`', line: false };
+        case 'h1':        return { open: '# ', close: '', line: true };
+        case 'h2':        return { open: '## ', close: '', line: true };
+        case 'h3':        return { open: '### ', close: '', line: true };
+      }
+  }
+  return { open: '', close: '', line: false };
+}
+
+// Core transcription engine — wraps/unwraps selection with format-aware syntax
+function applyDocFormat(style) {
+  const ta = document.getElementById('doc-content-textarea');
+  if (!ta) return;
+
+  // Preserve selection indexes (mousedown on toolbar button causes blur)
+  const start = ta.selectionStart;
+  const end   = ta.selectionEnd;
+  const fmt   = _getDocFormat();
+  const tokens = _getFormatTokens(style, fmt);
+
+  if (!tokens.open && !tokens.close) {
+    ta.focus();
+    return; // no-op (e.g. heading in CSV)
+  }
+
+  const { open, close, line } = tokens;
+  const fullText = ta.value;
+
+  if (line) {
+    // Heading / line-level prefix — operate on the current line
+    const lineStart = fullText.lastIndexOf('\n', start - 1) + 1;
+    const lineEnd   = fullText.indexOf('\n', start);
+    const lineEndActual = lineEnd === -1 ? fullText.length : lineEnd;
+    const lineText  = fullText.slice(lineStart, lineEndActual);
+
+    let newLine;
+    if (fmt === 'html') {
+      // HTML heading: toggle <h1>...</h1> wrapping
+      const stripped = lineText.replace(/^<h[1-6]>(.*)<\/h[1-6]>$/, '$1');
+      if (stripped !== lineText) {
+        // Already wrapped — remove old heading or swap level
+        const currentTag = lineText.match(/^<(h[1-6])>/)?.[1];
+        if (currentTag && lineText.startsWith(`${open}`)) {
+          newLine = stripped; // toggle off
+        } else {
+          newLine = `${open}${stripped}${close}`; // swap level
+        }
+      } else {
+        newLine = `${open}${lineText}${close}`;
+      }
+    } else {
+      // Markdown-style heading — strip any existing heading prefix first
+      const stripped = lineText.replace(/^#{1,6}\s?/, '');
+      if (lineText.startsWith(open)) {
+        newLine = stripped; // toggle off same level
+      } else {
+        newLine = `${open}${stripped}`; // apply (possibly changing level)
+      }
+    }
+
+    ta.focus();
+    ta.setRangeText(newLine, lineStart, lineEndActual, 'preserve');
+    // Keep cursor inside edited line
+    ta.selectionStart = lineStart;
+    ta.selectionEnd   = lineStart + newLine.length;
+
+  } else {
+    // Inline format — wrap/unwrap the selection
+    const selected = fullText.slice(start, end);
+
+    // Check if the selection itself is already wrapped
+    const alreadyWrapped =
+      selected.startsWith(open) &&
+      (close === '' || selected.endsWith(close)) &&
+      selected.length > open.length + close.length;
+
+    // Also check surrounding characters
+    const surroundBefore = fullText.slice(Math.max(0, start - open.length), start);
+    const surroundAfter  = close ? fullText.slice(end, Math.min(fullText.length, end + close.length)) : '';
+    const surroundWrapped = surroundBefore === open && (close === '' || surroundAfter === close);
+
+    ta.focus();
+
+    if (alreadyWrapped) {
+      // Strip inner markers
+      const unwrapped = selected.slice(open.length, close ? selected.length - close.length : selected.length);
+      ta.setRangeText(unwrapped, start, end, 'end');
+      ta.selectionStart = start;
+      ta.selectionEnd   = start + unwrapped.length;
+    } else if (surroundWrapped) {
+      // Strip surrounding markers (selection doesn't include them)
+      const before = fullText.slice(0, start - open.length);
+      const after  = fullText.slice(end + close.length);
+      const newVal = before + selected + after;
+      const newStart = start - open.length;
+      ta.value = newVal;
+      ta.selectionStart = newStart;
+      ta.selectionEnd   = newStart + selected.length;
+    } else {
+      // Wrap selection
+      const wrapped = open + selected + close;
+      ta.setRangeText(wrapped, start, end, 'end');
+      if (!selected) {
+        // No selection: place cursor between markers
+        ta.selectionStart = ta.selectionEnd = start + open.length;
+      } else {
+        ta.selectionStart = start;
+        ta.selectionEnd   = start + wrapped.length;
+      }
+    }
+  }
+
+  scheduleDocSave();
+  _updateFormatBadge();
+}
+
+// Update the format badge hint in the toolbar
+function _updateFormatBadge() {
+  const badge = document.getElementById('doc-format-hint');
+  if (!badge) return;
+  const fmt = _getDocFormat();
+  const labels = { markdown: 'MD', html: 'HTML', csv: 'CSV', plain: 'TXT' };
+  badge.textContent = labels[fmt] || fmt.toUpperCase();
+}
+
+// Bind toolbar buttons, heading select, and keyboard shortcuts
+function bindDocToolbar() {
+  // Update format badge whenever format select changes
+  const fmtSel = document.getElementById('doc-format-select');
+  fmtSel?.addEventListener('change', _updateFormatBadge);
+  _updateFormatBadge();
+
+  // Toolbar buttons — use mousedown + preventDefault to preserve textarea selection
+  function bindBtn(id, style) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('mousedown', (e) => { e.preventDefault(); }); // keep focus+selection
+    btn.addEventListener('click', () => applyDocFormat(style));
+  }
+
+  bindBtn('doc-bold-btn',      'bold');
+  bindBtn('doc-italic-btn',    'italic');
+  bindBtn('doc-underline-btn', 'underline');
+  bindBtn('doc-strike-btn',    'strike');
+  bindBtn('doc-code-btn',      'code');
+
+  // Heading select
+  const headingSel = document.getElementById('doc-heading-select');
+  if (headingSel) {
+    headingSel.addEventListener('mousedown', (e) => { e.stopPropagation(); });
+    headingSel.addEventListener('change', () => {
+      const val = headingSel.value;
+      if (val) applyDocFormat(val);   // 'h1', 'h2', 'h3'
+      headingSel.value = '';          // reset visual state
+      document.getElementById('doc-content-textarea')?.focus();
+    });
+  }
+
+  // Keyboard shortcuts on the document textarea
+  const ta = document.getElementById('doc-content-textarea');
+  if (!ta) return;
+  ta.addEventListener('keydown', (e) => {
+    const mod = isMac ? e.metaKey : e.ctrlKey;
+    if (!mod) return;
+    switch (e.key.toLowerCase()) {
+      case 'b': e.preventDefault(); applyDocFormat('bold');      break;
+      case 'i': e.preventDefault(); applyDocFormat('italic');    break;
+      case 'u': e.preventDefault(); applyDocFormat('underline'); break;
+    }
+  });
 }
 
 // ─── Start ────────────────────────────────────────────────────────────────────

@@ -183,11 +183,13 @@ body { background: var(--bg); color: var(--fg); }
 
 /* ─── Nav Rail ────────────────────────────────────── */
 #nav-rail {
-  width: 56px; min-width: 56px; height: 100vh;
+  width: var(--nav-rail-width, 56px); min-width: 56px; max-width: 300px; height: 100vh;
   background: var(--panel); border-right: 1px solid var(--border);
   display: flex; flex-direction: column; align-items: center;
   padding: 10px 0; z-index: 200; gap: 2px; flex-shrink: 0;
-  transition: width 0.2s;
+  transition: width 0.25s ease;
+  position: relative;
+  overflow: visible;
 }
 #nav-logo {
   font-size: 22px; color: var(--red); margin-bottom: 10px;
@@ -210,8 +212,14 @@ body { background: var(--bg); color: var(--fg); }
 }
 .nav-item:hover { background: var(--panel2); color: var(--fg); }
 .nav-item.active { background: var(--accent-dim); color: var(--red); }
-/* Icon-only rail — no text labels, no group headers */
-.nav-label { display: none; }
+/* Icon-only rail — labels hidden but animatable */
+.nav-label {
+  display: inline-block; overflow: hidden; white-space: nowrap;
+  text-overflow: ellipsis; font-size: 13px; font-weight: 500;
+  opacity: 0; max-width: 0; pointer-events: none;
+  transform: translateX(-6px);
+  transition: opacity 0.2s ease, max-width 0.25s ease, transform 0.2s ease;
+}
 .nav-group-label { display: none; }
 
 /* Thin divider line between sections */
@@ -1332,7 +1340,7 @@ body.font-lg { font-size: 17px; }
   .message-row { padding: 4px 10px; }
   #input-area { padding: 8px 10px; }
   .theme-swatches { grid-template-columns: repeat(2, 1fr); }
-  #nav-rail { width: 48px; min-width: 48px; }
+  #nav-rail { --nav-rail-width: 48px; min-width: 48px; }
   .nav-item { width: 40px; height: 40px; }
 }
 
@@ -1528,16 +1536,14 @@ body.font-lg { font-size: 17px; }
   transition: background 0.15s;
 }
 #nav-restore-btn:hover { background: var(--panel2); color: var(--fg); }
-#nav-rail.nav-hidden ~ #nav-restore-btn { display: flex; }
-/* Simpler: use a sibling or body class */
 body.nav-rail-hidden #nav-restore-btn { display: flex; }
-body.nav-rail-hidden #nav-rail { width: 0; min-width: 0; overflow: hidden; padding: 0; border: none; }
+body.nav-rail-hidden #nav-rail { width: 0 !important; min-width: 0 !important; overflow: hidden; padding: 0; border: none; }
 body.chat-sidebar-hidden #chat-sidebar { transform: translateX(-260px); width: 0; min-width: 0; }
 
 /* ─── Task 2.2: Expandable sidebar labels ────────────── */
 /* Nav rail expanded state — show labels */
 #nav-rail.expanded {
-  width: 160px; min-width: 160px;
+  min-width: 80px;
   align-items: flex-start;
   padding: 10px 8px;
 }
@@ -1545,7 +1551,9 @@ body.chat-sidebar-hidden #chat-sidebar { transform: translateX(-260px); width: 0
   width: 100%; justify-content: flex-start;
   padding: 0 10px; gap: 10px; border-radius: 8px;
 }
-#nav-rail.expanded .nav-label { display: inline; font-size: 13px; font-weight: 500; white-space: nowrap; }
+#nav-rail.labels-visible .nav-label {
+  opacity: 1; max-width: 180px; transform: translateX(0); pointer-events: auto;
+}
 #nav-rail.expanded .nav-group-label { display: block; font-size: 9px; font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 10px 2px; }
 #nav-rail.expanded #nav-logo { text-align: left; padding-left: 10px; font-size: 20px; }
 #nav-rail.expanded .nav-divider { width: calc(100% - 16px); margin: 4px 8px; }
@@ -1553,17 +1561,20 @@ body.chat-sidebar-hidden #chat-sidebar { transform: translateX(-260px); width: 0
 #nav-rail.expanded .nav-user-avatar { margin-left: 4px; }
 #nav-rail.expanded .nav-collapse { align-items: flex-start; }
 #nav-rail.expanded .nav-sub-item { width: 100%; padding: 0 10px; }
-/* Expand toggle button */
-#nav-expand-btn {
-  position: absolute; bottom: 10px; right: -12px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--panel); border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; cursor: pointer; color: var(--text-muted);
-  z-index: 201; transition: background 0.15s; box-shadow: 0 2px 6px var(--shadow);
+/* Drag-to-resize handle on right edge of nav rail */
+#nav-resize-handle {
+  position: absolute; top: 0; right: 0;
+  width: 5px; height: 100%;
+  cursor: ew-resize; z-index: 210;
+  background: transparent;
+  transition: background 0.15s;
+  border-radius: 0 3px 3px 0;
 }
-#nav-expand-btn:hover { background: var(--panel2); color: var(--fg); }
-#nav-rail { position: relative; }
+#nav-resize-handle:hover, #nav-resize-handle.active {
+  background: var(--red); opacity: 0.35;
+}
+/* Disable width transition while dragging for real-time feel */
+#nav-rail.is-dragging { transition: none !important; }
 
 /* ─── Task 3.3: Model avatar tag in chat ─────────────── */
 .message-avatar .model-tag {
@@ -1675,7 +1686,7 @@ body.focus-mode #chat-sidebar {
   transform: translateX(-260px); width: 0; min-width: 0;
 }
 body.focus-mode #nav-rail {
-  width: 0; min-width: 0; overflow: hidden; padding: 0; border: none;
+  width: 0 !important; min-width: 0 !important; overflow: hidden; padding: 0; border: none;
 }
 body.focus-mode #nav-restore-btn { display: flex; }
 
@@ -1693,4 +1704,109 @@ body.focus-mode #nav-restore-btn { display: flex; }
   #research-input-row, #agent-input-row { padding-left: max(28px, calc((100% - 860px)/2)); padding-right: max(28px, calc((100% - 860px)/2)); }
   #memory-header { padding-left: max(28px, calc((100% - 760px)/2)); padding-right: max(28px, calc((100% - 760px)/2)); }
   #memory-list { padding-left: max(20px, calc((100% - 760px)/2)); padding-right: max(20px, calc((100% - 760px)/2)); }
+}
+
+/* ═══════════════════════════════════════════════════
+   WYSIWYG TOOLBAR, DROPDOWN FIXES & SIDEBAR ACCORDION
+   ═══════════════════════════════════════════════════ */
+
+/* ── Fix overflow clipping dropdowns in doc tabbar ── */
+#doc-tabbar { overflow: visible; }
+#doc-toolbar { overflow: visible; }
+
+/* ── Dropdown wrapper: positions menus relative to trigger ── */
+.doc-dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.doc-dropdown-wrap .dropdown-menu,
+.doc-dropdown-wrap .export-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+  z-index: 650;
+}
+
+/* ── Correct .dropdown-menu default placement ── */
+.dropdown-menu {
+  top: calc(100% + 4px);
+  left: 0;
+}
+
+/* ── Export menu (full style override) ── */
+.export-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); left: auto;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 32px var(--shadow);
+  z-index: 650; min-width: 160px; overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+/* ── Doc AI menu positioning: lives inside .doc-dropdown-wrap now ── */
+#doc-ai-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: auto;
+  z-index: 650;
+  min-width: 200px;
+}
+
+/* ── Document WYSIWYG toolbar ── */
+#doc-wysiwyg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Format badge pill shown in toolbar */
+.doc-format-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--red);
+  background: var(--accent-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 5px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+/* ── Sidebar Tools accordion chevron ── */
+.nav-tools-chevron {
+  flex-shrink: 0;
+  margin-left: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+#nav-rail.labels-visible .nav-tools-chevron {
+  opacity: 1;
+}
+#nav-tools-toggle.tools-open .nav-tools-chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Sub-item label alignment when nav is expanded ── */
+#nav-rail.expanded .nav-sub-item {
+  justify-content: flex-start;
+  padding: 0 10px 0 18px; /* indent sub-items under the Tools header */
+}
+
+/* Smooth accordion animation */
+#nav-tools-collapse {
+  transition: max-height 0.3s ease-in-out, opacity 0.2s ease;
+  opacity: 0;
+}
+#nav-tools-collapse.open {
+  opacity: 1;
 }

@@ -1,7 +1,7 @@
 # UI/UX & Functional Feature: UI Overhaul, Component Fixes, and Feature Additions
 
 ## 1. Layout & UI Polish
-- [ ] **Page Stretching:** Fix the layout of the **Deep Research, Agents, Memory, and Forge** sections. The headers do not currently span the full width of the page, and the overall content looks horizontally squished. Make these sections full-width/responsive.
+- [🚧] **Page Stretching:** Fix the layout of the **Deep Research, Agents, Memory, and Forge** sections. The headers do not currently span the full width of the page, and the overall content looks horizontally squished. Make these sections full-width/responsive.
 - [ ] **Settings Page Cleanup:** Fix alignment issues on the Settings page. For example, the hex color code input field is spilling out of the color picker box. Make the settings container wider so all elements fit comfortably without overlapping.
 - [ ] **Theme Visibility Audit:** Review all application themes. Fix text-contrast bugs in specific themes; for example, in the **Mabinogi theme**, code blocks use a dark background with dark text, making the code unreadable. Ensure code blocks have proper contrast in every theme.
 - [ ] **Loading Animation:** Replace the current loading spinning square with a **3D spinning cube** animation.

@@ -1,10 +1,10 @@
-# 🚀 Phase 2 Roadmap — Glyndwr as an AI Operating System
+# 🚀 Phase 2 Roadmap — Glyndwr as an AI Workspace
 
 > 📎 See also: [README.md](README.md) · [GUIDES.md](GUIDES.md)
 
 ## Status
 
-| Symbol | Meaning |
+| Symbol | Meaning 
 | ------ | ------- |
 | ⬜ | Not started |
 | 🚧 | In progress |

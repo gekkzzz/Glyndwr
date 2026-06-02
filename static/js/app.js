@@ -1380,10 +1380,12 @@ async function runDocAI(action) {
         try {
           const data = JSON.parse(line.slice(6));
           if (data.done) break;
-          if (data.error) throw new Error(data.error);
+          if (data.error) { throw new Error(data.error); }
           result += data.content || '';
           outputEl.textContent = result.slice(0, 80) + (result.length > 80 ? '…' : '');
-        } catch {}
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.startsWith('JSON')) throw parseErr;
+        }
       }
     }
     if (result) {

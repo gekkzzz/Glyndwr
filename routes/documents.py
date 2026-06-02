@@ -127,62 +127,67 @@ async def delete_document(doc_id: str):
 
 @router.post("/{doc_id}/ai")
 async def ai_assist(doc_id: str, req: AIAssistRequest):
-    """Stream AI-assisted edits/suggestions for document content."""
-    import httpx
-    from core.config import settings
+    """Stream AI-assisted edits/suggestions for document content.
+
+    Uses the same provider-routing and DB-settings lookup as the chat
+    endpoint, so Ollama, OpenRouter, DeepSeek, etc. all work out of the box.
+    """
+    from core import database as db_module
+    from services.llm import stream_chat, _get_provider_for_model
 
     model = req.model or "gpt-4o-mini"
-    api_key = settings.openai_api_key or ""
-    base_url = "https://api.openai.com/v1"
+    provider = _get_provider_for_model(model)
 
-    if model.startswith("claude"):
-        api_key = settings.anthropic_api_key or ""
-    elif model.startswith("gemini"):
-        api_key = settings.gemini_api_key or ""
-        base_url = "https://generativelanguage.googleapis.com/v1beta/openai"
-    elif model.startswith("llama") or model.startswith("mixtral"):
-        api_key = settings.grok_api_key or ""
-        base_url = "https://grok-api.apidog.io/openai/v1"
+    # Pull API keys / Ollama host from the database (where the UI saves them)
+    db_settings = await db_module.get_all_settings()
 
-    if not api_key:
-        raise HTTPException(status_code=400, detail="No API key configured")
+    # Quick sanity check: make sure the resolved provider actually has credentials
+    def _has_creds(p: str) -> bool:
+        from core.config import settings as cfg
+        key_map = {
+            "openai":     ("openai_api_key",     cfg.openai_api_key),
+            "anthropic":  ("anthropic_api_key",  cfg.anthropic_api_key),
+            "grok":       ("grok_api_key",        cfg.grok_api_key),
+            "gemini":     ("gemini_api_key",      cfg.gemini_api_key),
+            "deepseek":   ("deepseek_api_key",    cfg.deepseek_api_key),
+            "openrouter": ("openrouter_api_key",  cfg.openrouter_api_key),
+            "ollama":     ("ollama_host",         cfg.ollama_host),
+        }
+        if p not in key_map:
+            return False
+        db_key, env_val = key_map[p]
+        return bool(db_settings.get(db_key) or env_val)
+
+    if not _has_creds(provider):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No credentials configured for provider '{provider}' (model: {model}). "
+                   f"Add your API key in Settings → Providers.",
+        )
 
     text = req.selection or req.context
     action_prompts = {
-        "improve": f"Improve the writing of this text. Keep the same meaning but make it clearer and more engaging:\n\n{text}",
-        "summarize": f"Write a concise summary of this text:\n\n{text}",
-        "expand": f"Expand this text with more detail and depth:\n\n{text}",
-        "translate": f"Translate this text to English (or if already English, to Spanish):\n\n{text}",
-        "fix_grammar": f"Fix any grammar, spelling and punctuation errors in this text:\n\n{text}",
-        "explain": f"Explain this text in simple terms:\n\n{text}",
-        "custom": f"{req.instruction}:\n\n{text}",
+        "improve":     f"Improve the writing of this text. Keep the same meaning but make it clearer and more engaging:\n\n{text}",
+        "summarize":   f"Write a concise summary of this text:\n\n{text}",
+        "expand":      f"Expand this text with more detail and depth:\n\n{text}",
+        "translate":   f"Translate this text to English (or if already English, to Spanish):\n\n{text}",
+        "fix_grammar": f"Fix any grammar, spelling, punctuation and style errors in this text. Return only the corrected text:\n\n{text}",
+        "explain":     f"Explain the concepts in this text in clear, simple terms:\n\n{text}",
+        "custom":      f"{req.instruction}:\n\n{text}",
     }
-
     prompt = action_prompts.get(req.action, action_prompts["improve"])
+    messages = [{"role": "user", "content": prompt}]
 
     async def stream():
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                async with client.stream(
-                    "POST",
-                    f"{base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": model, "messages": [{"role": "user", "content": prompt}], "stream": True},
-                ) as r:
-                    async for line in r.aiter_lines():
-                        if not line.startswith("data: "):
-                            continue
-                        chunk_str = line[6:]
-                        if chunk_str == "[DONE]":
-                            yield f"data: {json.dumps({'done': True})}\n\n"
-                            break
-                        try:
-                            chunk = json.loads(chunk_str)
-                            content = chunk["choices"][0]["delta"].get("content", "")
-                            if content:
-                                yield f"data: {json.dumps({'content': content})}\n\n"
-                        except Exception:
-                            pass
+            async for chunk in stream_chat(
+                provider=provider,
+                model=model,
+                messages=messages,
+                system_prompt="You are a helpful writing assistant. Return only the requested output — no preamble, no meta-commentary.",
+                db_settings=db_settings,
+            ):
+                yield chunk
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 

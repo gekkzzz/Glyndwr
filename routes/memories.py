@@ -12,6 +12,7 @@ from core.database import (
     get_memories, create_memory, delete_memory, clear_memories,
     get_all_settings, get_messages,
 )
+from services.llm import _get_provider_for_model, stream_chat
 
 router = APIRouter(prefix="/api/memories", tags=["memories"])
 
@@ -89,8 +90,6 @@ async def extract_from_conversation(body: ExtractRequest):
     Use the LLM to extract memorable facts from a conversation
     and store them as individual memory entries.
     """
-    from services.llm import _get_provider_for_model, PROVIDER_BASE_URLS, _stream_openai_compatible
-    import httpx
 
     messages = await get_messages(body.conversation_id)
     if not messages:
@@ -104,28 +103,32 @@ async def extract_from_conversation(body: ExtractRequest):
     )
 
     db_settings = await get_all_settings()
+    from core.config import settings as app_settings
 
     def k(db_key, env_val):
         return db_settings.get(db_key) or env_val or ""
 
-    from core.config import settings as app_settings
     provider = _get_provider_for_model(body.model)
-
-    if provider == "openai":
-        api_key = k("openai_api_key", app_settings.openai_api_key)
-        base_url = PROVIDER_BASE_URLS["openai"]
-    elif provider == "groq":
-        api_key = k("groq_api_key", app_settings.groq_api_key)
-        base_url = PROVIDER_BASE_URLS["groq"]
-    elif provider == "ollama":
+    if provider == "ollama":
         api_key = "ollama"
         host = db_settings.get("ollama_host") or app_settings.ollama_host or "http://localhost:11434"
-        base_url = f"{host}/v1"
+        db_settings = {**db_settings, "ollama_host": host}
+    elif provider == "openai":
+        api_key = k("openai_api_key", app_settings.openai_api_key)
+    elif provider == "groq":
+        api_key = k("groq_api_key", app_settings.groq_api_key)
+    elif provider == "anthropic":
+        api_key = k("anthropic_api_key", app_settings.anthropic_api_key)
+    elif provider == "gemini":
+        api_key = k("gemini_api_key", app_settings.gemini_api_key)
+    elif provider == "openrouter":
+        api_key = k("openrouter_api_key", app_settings.openrouter_api_key)
+    elif provider == "deepseek":
+        api_key = k("deepseek_api_key", app_settings.deepseek_api_key)
     else:
         api_key = k("openai_api_key", app_settings.openai_api_key)
-        base_url = PROVIDER_BASE_URLS["openai"]
 
-    if not api_key:
+    if provider != "ollama" and not api_key:
         raise HTTPException(status_code=400, detail="No API key configured for memory extraction.")
 
     system = (
@@ -141,24 +144,22 @@ async def extract_from_conversation(body: ExtractRequest):
     prompt = f"Extract memorable facts from this conversation:\n\n{convo}"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                f"{base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": body.model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "max_tokens": 1000,
-                    "temperature": 0.3,
-                },
-            )
-            resp.raise_for_status()
-            text = resp.json()["choices"][0]["message"]["content"].strip()
+        full_response = ""
+        async for chunk in stream_chat(
+            provider=provider,
+            model=body.model,
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt=system,
+            db_settings=db_settings,
+        ):
+            if not chunk.startswith("data: "):
+                continue
+            payload = json.loads(chunk[6:])
+            if payload.get("done"):
+                continue
+            full_response += payload.get("content", "")
 
-        # Parse JSON from response
+        text = full_response.strip()
         if text.startswith("```"):
             text = text.split("```")[1]
             if text.startswith("json"):

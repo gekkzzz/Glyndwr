@@ -1860,20 +1860,26 @@ function applyManualHardware() {
 
 // ── Model database (from llmfit patterns) ─────────────────
 const FORGE_MODELS = [
-  { name: 'Llama 3.2 1B',     ollama: 'llama3.2:1b',      size: 0.8,  vram: 2,  ram: 4,  tier: 'any',  tags: ['fast','tiny','chat'],           desc: 'Runs on virtually any device including phones. Great for quick tasks and testing.' },
-  { name: 'Phi-4 Mini',       ollama: 'phi4-mini',         size: 2.5,  vram: 3,  ram: 8,  tier: 'any',  tags: ['reasoning','tiny','code'],       desc: "Microsoft's tiny but surprisingly capable reasoning model." },
-  { name: 'Llama 3.2 3B',     ollama: 'llama3.2:3b',       size: 2,    vram: 4,  ram: 8,  tier: 'low',  tags: ['fast','balanced','chat'],        desc: 'Small but capable. Runs on integrated graphics or CPU.' },
-  { name: 'Gemma 3 4B',       ollama: 'gemma3:4b',         size: 3,    vram: 4,  ram: 8,  tier: 'low',  tags: ['balanced','fast','multimodal'],  desc: "Google's latest small model with vision support." },
-  { name: 'Mistral 7B',       ollama: 'mistral',           size: 4.5,  vram: 6,  ram: 16, tier: 'mid',  tags: ['balanced','fast','chat'],        desc: 'Excellent instruction following and speed. A solid all-rounder.' },
-  { name: 'Llama 3.1 8B',     ollama: 'llama3.1:8b',       size: 5,    vram: 8,  ram: 16, tier: 'mid',  tags: ['balanced','code','reasoning'],   desc: 'Sweet spot for most tasks. Needs 8 GB+ VRAM or a fast CPU.' },
-  { name: 'Gemma 2 9B',       ollama: 'gemma2:9b',         size: 6,    vram: 10, ram: 16, tier: 'mid',  tags: ['balanced','safe','fast'],        desc: "Google's compact but strong model with good safety alignment." },
-  { name: 'Llama 3.1 70B Q4', ollama: 'llama3.1:70b-q4',  size: 40,   vram: 24, ram: 48, tier: 'high', tags: ['frontier','reasoning','code'],   desc: 'Near-frontier quality at 4-bit quantisation. Requires a high-end GPU.' },
-  { name: 'Qwen 2.5 14B',     ollama: 'qwen2.5:14b',       size: 9,    vram: 12, ram: 24, tier: 'high', tags: ['reasoning','code','multilingual'],'desc': 'Strong multilingual model. Great for coding and complex reasoning.' },
-  { name: 'DeepSeek-R1 7B',   ollama: 'deepseek-r1:7b',    size: 5,    vram: 8,  ram: 16, tier: 'mid',  tags: ['reasoning','math','code'],       desc: 'Thinking model with chain-of-thought. Good reasoning at 7B scale.' },
-  { name: 'DeepSeek-R1 32B',  ollama: 'deepseek-r1:32b',   size: 20,   vram: 24, ram: 32, tier: 'high', tags: ['reasoning','math','code'],       desc: 'Strong reasoning model. Rivals GPT-4o on benchmarks. Needs 24 GB VRAM.' },
-  { name: 'Gemma 3 27B',      ollama: 'gemma3:27b',        size: 17,   vram: 20, ram: 32, tier: 'high', tags: ['balanced','vision','long-ctx'],  desc: 'Strong multimodal model with vision support and long context.' },
-  { name: 'Llama 3.3 70B',    ollama: 'llama3.3:70b',      size: 40,   vram: 48, ram: 64, tier: 'pro',  tags: ['frontier','reasoning','code'],   desc: 'Near-frontier performance. Needs dual GPUs or 48 GB+ VRAM.' },
-  { name: 'Qwen 2.5 72B',     ollama: 'qwen2.5:72b',       size: 45,   vram: 48, ram: 64, tier: 'pro',  tags: ['reasoning','multilingual','code'],'desc': 'One of the strongest open models. Requires workstation hardware.' },
+  { name: 'OpenAI GPT-4o',            provider: 'openai',  command: 'Use with OpenAI API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','chat','powerful'], desc: 'OpenAI cloud model with strong reasoning and conversational abilities.' },
+  { name: 'ChatGPT 3.5 Turbo',        provider: 'openai',  command: 'Use with OpenAI API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','chat','fast'], desc: 'OpenAI’s ChatGPT-class model for general assistant tasks and lightweight chat.' },
+  { name: 'Anthropic Claude Opus 4',   provider: 'anthropic',command: 'Use with Anthropic API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','safety','long-context'], desc: 'Anthropic’s Claude Opus 4 offers strong context understanding and safe responses.' },
+  { name: 'Anthropic Claude Sonnet 4', provider: 'anthropic',command: 'Use with Anthropic API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','creative','chat'], desc: 'Anthropic’s Claude Sonnet 4 is tuned for creative writing and dialogue.' },
+  { name: 'Google Gemini 2.0 Flash',   provider: 'gemini',   command: 'Use with Gemini API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','fast','multimodal'], desc: 'Google Gemini offers fast inference and strong multimodal support on the cloud.' },
+  { name: 'Google Gemini 1.5 Pro',     provider: 'gemini',   command: 'Use with Gemini API key', size: 'Cloud', vram: 0,  ram: 0,  tier: 'any', tags: ['cloud','powerful','chat'], desc: 'Gemini 1.5 Pro is a capable cloud model for rich conversations and coding.' },
+  { name: 'Llama 3.2 1B',             provider: 'ollama',  ollama: 'llama3.2:1b',      size: 0.8,  vram: 2,  ram: 4,  tier: 'any', tags: ['fast','tiny','chat'],           desc: 'Runs on virtually any device including phones. Great for quick tasks and testing.' },
+  { name: 'Phi-4 Mini',               provider: 'ollama',  ollama: 'phi4-mini',         size: 2.5,  vram: 3,  ram: 8,  tier: 'any', tags: ['reasoning','tiny','code'],       desc: "Microsoft's tiny but surprisingly capable reasoning model." },
+  { name: 'Llama 3.2 3B',             provider: 'ollama',  ollama: 'llama3.2:3b',       size: 2,    vram: 4,  ram: 8,  tier: 'low', tags: ['fast','balanced','chat'],        desc: 'Small but capable. Runs on integrated graphics or CPU.' },
+  { name: 'Gemma 3 4B',               provider: 'ollama',  ollama: 'gemma3:4b',         size: 3,    vram: 4,  ram: 8,  tier: 'low', tags: ['balanced','fast','multimodal'],  desc: "Google's latest small model with vision support." },
+  { name: 'Mistral 7B',               provider: 'ollama',  ollama: 'mistral',           size: 4.5,  vram: 6,  ram: 16, tier: 'mid', tags: ['balanced','fast','chat'],        desc: 'Excellent instruction following and speed. A solid all-rounder.' },
+  { name: 'Llama 3.1 8B',             provider: 'ollama',  ollama: 'llama3.1:8b',       size: 5,    vram: 8,  ram: 16, tier: 'mid', tags: ['balanced','code','reasoning'],   desc: 'Sweet spot for most tasks. Needs 8 GB+ VRAM or a fast CPU.' },
+  { name: 'Gemma 2 9B',               provider: 'ollama',  ollama: 'gemma2:9b',         size: 6,    vram: 10, ram: 16, tier: 'mid', tags: ['balanced','safe','fast'],        desc: "Google's compact but strong model with good safety alignment." },
+  { name: 'Llama 3.1 70B Q4',         provider: 'ollama',  ollama: 'llama3.1:70b-q4',  size: 40,   vram: 24, ram: 48, tier: 'high', tags: ['frontier','reasoning','code'],   desc: 'Near-frontier quality at 4-bit quantisation. Requires a high-end GPU.' },
+  { name: 'Qwen 2.5 14B',             provider: 'ollama',  ollama: 'qwen2.5:14b',       size: 9,    vram: 12, ram: 24, tier: 'high', tags: ['reasoning','code','multilingual'],'desc': 'Strong multilingual model. Great for coding and complex reasoning.' },
+  { name: 'DeepSeek-R1 7B',           provider: 'ollama',  ollama: 'deepseek-r1:7b',    size: 5,    vram: 8,  ram: 16, tier: 'mid', tags: ['reasoning','math','code'],       desc: 'Thinking model with chain-of-thought. Good reasoning at 7B scale.' },
+  { name: 'DeepSeek-R1 32B',          provider: 'ollama',  ollama: 'deepseek-r1:32b',   size: 20,   vram: 24, ram: 32, tier: 'high', tags: ['reasoning','math','code'],       desc: 'Strong reasoning model. Rivals GPT-4o on benchmarks. Needs 24 GB VRAM.' },
+  { name: 'Gemma 3 27B',              provider: 'ollama',  ollama: 'gemma3:27b',        size: 17,   vram: 20, ram: 32, tier: 'high', tags: ['balanced','vision','long-ctx'],  desc: 'Strong multimodal model with vision support and long context.' },
+  { name: 'Llama 3.3 70B',            provider: 'ollama',  ollama: 'llama3.3:70b',      size: 40,   vram: 48, ram: 64, tier: 'pro', tags: ['frontier','reasoning','code'],   desc: 'Near-frontier performance. Needs dual GPUs or 48 GB+ VRAM.' },
+  { name: 'Qwen 2.5 72B',             provider: 'ollama',  ollama: 'qwen2.5:72b',       size: 45,   vram: 48, ram: 64, tier: 'pro', tags: ['reasoning','multilingual','code'],'desc': 'One of the strongest open models. Requires workstation hardware.' },
 ];
 
 const TIER_LABELS = { any: 'Any hardware', low: 'Low-end', mid: 'Mid-range', high: 'High-end', pro: 'Workstation' };
@@ -1915,11 +1921,15 @@ function renderCookbookModels() {
         ? `<span class="hw-fit-badge hw-fit-good">Fits your GPU</span>`
         : `<span class="hw-fit-badge hw-fit-tight">Needs ${m.vram} GB VRAM</span>`)
       : '';
-    return `
+    const providerNames = { openai: 'OpenAI', anthropic: 'Anthropic', gemini: 'Google Gemini', ollama: 'Ollama', deepseek: 'DeepSeek', openrouter: 'OpenRouter' };
+  const providerLabel = providerNames[m.provider] || (m.provider ? m.provider.charAt(0).toUpperCase() + m.provider.slice(1) : 'Local');
+  const actionText = m.command || (m.ollama ? `ollama pull ${m.ollama}` : `Use with ${providerLabel} provider`);
+  return `
     <div class="cookbook-model-card ${fitClass}">
       <div class="cookbook-model-header">
         <div>
           <div class="cookbook-model-name">${escHtml(m.name)}</div>
+          <div class="cookbook-model-provider">${escHtml(providerLabel)}</div>
           ${fitBadge}
         </div>
         <span class="hw-fit-badge" style="background:color-mix(in srgb,${TIER_COLORS[m.tier]} 15%,transparent);color:${TIER_COLORS[m.tier]};border:1px solid ${TIER_COLORS[m.tier]}">${TIER_LABELS[m.tier]}</span>
@@ -1931,7 +1941,7 @@ function renderCookbookModels() {
         <span><strong>RAM:</strong> ${m.ram} GB+</span>
       </div>
       <div class="cookbook-model-tags">${m.tags.map(t => `<span class="cookbook-model-tag">${t}</span>`).join('')}</div>
-      <div class="cookbook-model-action">ollama pull ${escHtml(m.ollama)}</div>
+      <div class="cookbook-model-action">${escHtml(actionText)}</div>
     </div>`;
   }).join('');
 }

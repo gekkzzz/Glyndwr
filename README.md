@@ -6,7 +6,7 @@
   / /\ \/  \/ /\ \
  /_/  \_\  /_/  \_\
 
-  G L Y N D W R  v1.2
+  G L Y N D W R  v1.3
 ```
 
 Named after Owain Glyndwr, the last native Prince of Wales. A fully self-hosted AI workspace

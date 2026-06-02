@@ -1810,3 +1810,247 @@ body.focus-mode #nav-restore-btn { display: flex; }
 #nav-tools-collapse.open {
   opacity: 1;
 }
+
+/* ═══════════════════════════════════════════════════
+   DOC EDITOR PANEL LAYOUT + AI CHAT PANEL
+   ═══════════════════════════════════════════════════ */
+
+/* Editor panel is now a flex row: workspace | chat panel */
+#doc-editor-panel {
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: var(--bg);
+  position: relative;
+  height: 100%;
+}
+
+/* Workspace wrap takes remaining space, clips normally */
+#doc-workspace-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Right-side AI chat panel ── */
+#doc-ai-panel {
+  width: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel);
+  border-left: 0 solid var(--border);
+  transition: width 0.3s ease, border-left-width 0s 0.3s;
+  /* panel sits at full height of the editor */
+}
+#doc-ai-panel.open {
+  width: 340px;
+  border-left-width: 1px;
+  transition: width 0.3s ease, border-left-width 0s 0s;
+}
+
+/* Panel header */
+#doc-ai-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel2);
+  flex-shrink: 0;
+  min-width: 0;
+}
+.doc-ai-panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg);
+  flex: 1;
+  white-space: nowrap;
+}
+.doc-ai-panel-title-row svg { color: var(--red); flex-shrink: 0; }
+.doc-ai-panel-ctx-badge {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--red);
+  background: var(--accent-dim);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#doc-ai-panel-close {
+  width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-faint); transition: background 0.12s, color 0.12s;
+}
+#doc-ai-panel-close:hover { background: var(--panel); color: var(--fg); }
+
+/* Panel message feed */
+#doc-ai-panel-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.doc-ai-msg { display: flex; flex-direction: column; gap: 4px; }
+.doc-ai-msg-user { align-items: flex-end; }
+.doc-ai-msg-assistant { align-items: flex-start; }
+
+.doc-ai-msg-bubble {
+  max-width: 100%;
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+.doc-ai-msg-user .doc-ai-msg-bubble {
+  background: var(--user-bubble);
+  border: 1px solid color-mix(in srgb, var(--red) 25%, transparent);
+  border-bottom-right-radius: 3px;
+  color: var(--fg);
+}
+.doc-ai-msg-assistant .doc-ai-msg-bubble {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 3px;
+  color: var(--fg);
+}
+/* Inherit markdown styles inside panel bubbles */
+.doc-ai-msg-bubble p { margin: 4px 0; }
+.doc-ai-msg-bubble p:first-child { margin-top: 0; }
+.doc-ai-msg-bubble p:last-child { margin-bottom: 0; }
+.doc-ai-msg-bubble h1, .doc-ai-msg-bubble h2, .doc-ai-msg-bubble h3 {
+  margin: 10px 0 4px; font-weight: 700; color: var(--fg);
+}
+.doc-ai-msg-bubble code { background: var(--code-bg); color: var(--red); padding: 1px 5px; border-radius: 4px; font-size: 0.87em; }
+.doc-ai-msg-bubble pre { background: var(--code-bg) !important; border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 6px 0; position: relative; padding-bottom: 28px; }
+.doc-ai-code-insert-btn {
+  position: absolute; bottom: 5px; right: 6px;
+  font-size: 10px; font-weight: 700; padding: 2px 8px;
+  border-radius: 4px; border: 1px solid var(--border);
+  background: var(--panel); color: var(--text-muted);
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: border-color 0.12s, color 0.12s;
+}
+.doc-ai-code-insert-btn:hover { border-color: var(--red); color: var(--red); }
+.doc-ai-msg-bubble ul, .doc-ai-msg-bubble ol { padding-left: 18px; margin: 4px 0; }
+.doc-ai-msg-bubble strong { font-weight: 700; }
+
+/* Typing indicator inside panel */
+.doc-ai-msg-thinking .doc-ai-msg-bubble {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 12px;
+}
+
+/* Action buttons below AI message */
+.doc-ai-msg-actions {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  padding: 2px 0 0 2px;
+}
+.doc-ai-action-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 5px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.doc-ai-action-btn:hover { border-color: var(--red); color: var(--red); background: var(--accent-dim); }
+.doc-ai-action-btn.replace { border-color: var(--border); }
+
+/* Panel footer / input row */
+#doc-ai-panel-footer {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: var(--panel2);
+  flex-shrink: 0;
+}
+#doc-ai-panel-input {
+  flex: 1;
+  background: var(--panel);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 7px 10px;
+  resize: none;
+  max-height: 120px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-height: 34px;
+}
+#doc-ai-panel-input:focus { border-color: var(--red); }
+#doc-ai-panel-input::placeholder { color: var(--text-faint); }
+#doc-ai-panel-send {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#doc-ai-panel-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Dropdown section labels and separator */
+.dropdown-menu-section-label {
+  padding: 5px 14px 3px;
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  pointer-events: none;
+  user-select: none;
+}
+.dropdown-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+/* Panel open — shrink editor gracefully on smaller viewports */
+@media (max-width: 1100px) {
+  #doc-ai-panel.open { width: 300px; }
+}
+@media (max-width: 860px) {
+  #doc-ai-panel.open {
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 300px;
+    z-index: 50;
+    box-shadow: -4px 0 20px var(--shadow);
+  }
+}

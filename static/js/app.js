@@ -1233,6 +1233,14 @@ async function openDoc(id) {
     document.getElementById('doc-save-status').textContent = '';
     _updateWordCount(doc.content || '');
     applyDocView(_docView);
+    // Update panel context badge to reflect the newly opened doc
+    const ctxBadge = document.getElementById('doc-ai-panel-ctx');
+    if (ctxBadge) {
+      const t = doc.title || 'Document';
+      ctxBadge.textContent = t.slice(0, 18) + (t.length > 18 ? '…' : '');
+    }
+    // Reset cursor tracker for the new document
+    _docLastCursorPos = 0;
   } catch (e) { showToast(`Failed to load document: ${e.message}`, 'error'); }
 }
 
@@ -1349,38 +1357,112 @@ function _updateWordCount(text) {
   el.textContent = `${words} words · ${chars} chars`;
 }
 
-// ── AI assist ───────────────────────────────────────────────
+// ── AI assist — routing & panel engine ──────────────────────
+
+// Actions that rewrite the document inline
+const DOC_INLINE_ACTIONS = new Set(['fix_grammar', 'improve', 'expand', 'translate', 'change_tone']);
+
+// Panel conversation state — keyed by docId so history survives tab switches
+const _docAIPanel = {
+  open: false,
+  streaming: false,
+  // { [docId]: [{role, content}, …] }
+  history: {},
+};
+
+// Track last cursor position in the doc textarea so "Insert at cursor" works
+let _docLastCursorPos = 0;
+
+// Central router
 async function runDocAI(action) {
   if (!state.currentDocId) return;
-  const content = document.getElementById('doc-content-textarea').value;
-  const model = document.getElementById('model-select').value || state.currentModel;
-  if (!content.trim()) { showToast('Document is empty', 'warning'); return; }
+  const ta = document.getElementById('doc-content-textarea');
+  const content = ta.value;
+  if (!content.trim() && action !== 'chat') {
+    showToast('Document is empty', 'warning');
+    return;
+  }
 
+  // Detect partial selection for inline actions
+  let selection = '';
+  if (DOC_INLINE_ACTIONS.has(action) && ta.selectionStart !== ta.selectionEnd) {
+    selection = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  }
+
+  let instruction = '';
+  if (action === 'change_tone') {
+    const tone = await appPrompt('What tone should the text be rewritten in?', {
+      title: 'Change Tone',
+      placeholder: 'e.g. professional, casual, technical, persuasive…',
+      defaultValue: 'professional',
+    });
+    if (tone === null) return; // user cancelled dialog
+    instruction = tone;
+  } else if (action === 'translate') {
+    const lang = await appPrompt('Translate to which language?', {
+      title: 'Translate',
+      placeholder: 'e.g. Spanish, French, Japanese…',
+      defaultValue: 'Spanish',
+    });
+    if (lang === null) return; // user cancelled dialog
+    instruction = lang;
+  }
+
+  if (DOC_INLINE_ACTIONS.has(action)) {
+    _runDocAIInline(action, content, selection, instruction);
+  } else {
+    _openDocAIPanel(action, content);
+  }
+}
+
+// ── Inline rewrite ───────────────────────────────────────────
+async function _runDocAIInline(action, content, selection = '', instruction = '') {
+  const model = document.getElementById('model-select').value || state.currentModel;
   const bar = document.getElementById('doc-ai-bar');
   const statusEl = document.getElementById('doc-ai-status');
   const outputEl = document.getElementById('doc-ai-output');
   bar.style.display = 'flex';
-  statusEl.textContent = `AI: ${action}…`;
+  const scopeLabel = selection ? 'selection' : 'document';
+  statusEl.textContent = `AI: ${action} (${scopeLabel})…`;
   outputEl.textContent = '';
+
+  // Snapshot selection bounds so we can replace only the selected range if applicable
+  const ta = document.getElementById('doc-content-textarea');
+  const selStart = ta.selectionStart;
+  const selEnd   = ta.selectionEnd;
+  const hasSelection = selection.length > 0;
 
   try {
     const resp = await fetch(`/api/documents/${state.currentDocId}/ai`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, context: content, model }),
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({
+        action,
+        selection: hasSelection ? selection : '',
+        context: content,
+        instruction,
+        model,
+      }),
     });
-    if (!resp.ok) { const err = await resp.json().catch(() => ({})); throw new Error(err.detail || 'AI error'); }
-    const reader = resp.body.getReader(); const decoder = new TextDecoder();
-    let result = ''; let buffer = '';
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'AI error');
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let result = '', buffer = '';
     while (true) {
-      const { done, value } = await reader.read(); if (done) break;
+      const { done, value } = await reader.read();
+      if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n'); buffer = lines.pop();
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         try {
           const data = JSON.parse(line.slice(6));
           if (data.done) break;
-          if (data.error) { throw new Error(data.error); }
+          if (data.error) throw new Error(data.error);
           result += data.content || '';
           outputEl.textContent = result.slice(0, 80) + (result.length > 80 ? '…' : '');
         } catch (parseErr) {
@@ -1389,14 +1471,290 @@ async function runDocAI(action) {
       }
     }
     if (result) {
-      document.getElementById('doc-content-textarea').value = result;
+      if (hasSelection) {
+        // Replace only the selected range with the AI output
+        ta.value = ta.value.slice(0, selStart) + result.trim() + ta.value.slice(selEnd);
+        const newEnd = selStart + result.trim().length;
+        ta.selectionStart = selStart;
+        ta.selectionEnd = newEnd;
+      } else {
+        ta.value = result;
+        ta.selectionStart = ta.selectionEnd = 0;
+      }
       scheduleDocSave();
-      showToast(`Applied: ${action}`, 'success');
+      showToast(`Applied: ${action}${hasSelection ? ' (selection)' : ''}`, 'success');
     }
-  } catch (e) { showToast(`AI error: ${e.message}`, 'error'); }
+  } catch (e) {
+    showToast(`AI error: ${e.message}`, 'error');
+  }
 
   bar.style.display = 'none';
   outputEl.textContent = '';
+}
+
+// ── Panel open/close ─────────────────────────────────────────
+function _openDocAIPanel(initialAction, docContent) {
+  const panel = document.getElementById('doc-ai-panel');
+  if (!panel) return;
+
+  panel.classList.add('open');
+  _docAIPanel.open = true;
+
+  // Set context badge label
+  const ctxBadge = document.getElementById('doc-ai-panel-ctx');
+  const title = document.getElementById('doc-title-input')?.value || 'Document';
+  if (ctxBadge) ctxBadge.textContent = title.slice(0, 18) + (title.length > 18 ? '…' : '');
+
+  // Focus input
+  setTimeout(() => document.getElementById('doc-ai-panel-input')?.focus(), 320);
+
+  // If a concrete action was triggered (summarize/explain), fire that message immediately
+  if (initialAction && initialAction !== 'chat') {
+    const actionLabels = {
+      summarize: 'Summarize this document for me.',
+      explain:   'Explain the key concepts in this document.',
+    };
+    const triggerText = actionLabels[initialAction] || 'Help me with this document.';
+    // Show user bubble for the trigger so the conversation looks natural
+    _appendDocAIPanelMsg('user', triggerText);
+    _sendDocAIPanelMessage(triggerText, docContent, true);
+  } else {
+    // Just opened for free-form chat — show a greeting if history is empty for this doc
+    const history = _docAIPanel.history[state.currentDocId] || [];
+    if (history.length === 0) {
+      _appendDocAIPanelMsg('assistant',
+        'Hi! I have your document loaded as context. You can ask me to summarize, explain concepts, ' +
+        'suggest improvements, or draft new sections. What would you like?'
+      );
+    }
+  }
+}
+
+function _closeDocAIPanel() {
+  const panel = document.getElementById('doc-ai-panel');
+  if (!panel) return;
+  panel.classList.remove('open');
+  _docAIPanel.open = false;
+}
+
+// ── Panel message rendering ───────────────────────────────────
+function _appendDocAIPanelMsg(role, content = '', isStreaming = false) {
+  const feed = document.getElementById('doc-ai-panel-messages');
+  if (!feed) return null;
+
+  const wrap = document.createElement('div');
+  wrap.className = `doc-ai-msg doc-ai-msg-${role}${isStreaming ? ' doc-ai-msg-thinking' : ''}`;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'doc-ai-msg-bubble';
+
+  if (role === 'assistant') {
+    bubble.innerHTML = content
+      ? renderMarkdown(content)
+      : '<span style="opacity:0.5;font-style:italic">Thinking…</span>';
+  } else {
+    bubble.textContent = content;
+  }
+
+  wrap.appendChild(bubble);
+  feed.appendChild(wrap);
+  feed.scrollTop = feed.scrollHeight;
+  return { wrap, bubble };
+}
+
+function _finaliseDocAIPanelMsg(elements, fullContent) {
+  const { wrap, bubble } = elements;
+  wrap.classList.remove('doc-ai-msg-thinking');
+  bubble.innerHTML = renderMarkdown(fullContent);
+
+  // Add per-code-block "Insert at cursor" button on every <pre> block
+  bubble.querySelectorAll('pre').forEach(pre => {
+    const codeEl = pre.querySelector('code');
+    const blockText = codeEl ? codeEl.innerText : pre.innerText;
+    const btn = document.createElement('button');
+    btn.className = 'doc-ai-code-insert-btn';
+    btn.title = 'Insert this block at cursor';
+    btn.textContent = '↓ Insert block';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _insertDocAIContent(blockText);
+    });
+    pre.style.position = 'relative';
+    pre.appendChild(btn);
+  });
+
+  // Message-level action buttons
+  const actions = document.createElement('div');
+  actions.className = 'doc-ai-msg-actions';
+  actions.innerHTML = `
+    <button class="doc-ai-action-btn insert">↓ Insert at cursor</button>
+    <button class="doc-ai-action-btn replace">⟳ Replace document</button>
+  `;
+  actions.querySelector('.insert').addEventListener('click', () => _insertDocAIContent(fullContent));
+  actions.querySelector('.replace').addEventListener('click', () => _replaceDocWithAIContent(fullContent));
+  wrap.appendChild(actions);
+
+  const feed = document.getElementById('doc-ai-panel-messages');
+  if (feed) feed.scrollTop = feed.scrollHeight;
+}
+
+// ── Panel message sending / streaming ────────────────────────
+async function _sendDocAIPanelMessage(userText, docContent, isInitialTrigger = false) {
+  if (_docAIPanel.streaming) return;
+  const docId = state.currentDocId;
+  if (!docId) return;
+
+  const model = document.getElementById('model-select').value || state.currentModel;
+  const context = docContent || document.getElementById('doc-content-textarea')?.value || '';
+
+  // Ensure history array for this doc
+  if (!_docAIPanel.history[docId]) _docAIPanel.history[docId] = [];
+  const history = _docAIPanel.history[docId];
+
+  // Append and render user message
+  if (!isInitialTrigger) {
+    _appendDocAIPanelMsg('user', userText);
+  }
+  history.push({ role: 'user', content: userText });
+
+  // Start streaming
+  _docAIPanel.streaming = true;
+  const sendBtn = document.getElementById('doc-ai-panel-send');
+  if (sendBtn) sendBtn.disabled = true;
+
+  const msgEls = _appendDocAIPanelMsg('assistant', '', true);
+  let fullContent = '';
+
+  try {
+    const resp = await fetch(`/api/documents/${docId}/ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({
+        action: 'chat',
+        context,
+        model,
+        messages: history.slice(),
+      }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || 'AI error');
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.done) break;
+          if (data.error) throw new Error(data.error);
+          fullContent += data.content || '';
+          // Stream update
+          if (msgEls) {
+            msgEls.bubble.innerHTML = renderMarkdown(fullContent);
+            const feed = document.getElementById('doc-ai-panel-messages');
+            if (feed) feed.scrollTop = feed.scrollHeight;
+          }
+        } catch (parseErr) {
+          if (parseErr.message && !parseErr.message.startsWith('JSON')) throw parseErr;
+        }
+      }
+    }
+
+    if (fullContent && msgEls) _finaliseDocAIPanelMsg(msgEls, fullContent);
+    history.push({ role: 'assistant', content: fullContent });
+
+  } catch (e) {
+    if (msgEls) {
+      msgEls.bubble.innerHTML = `<span style="color:var(--red)">Error: ${escHtml(e.message)}</span>`;
+    }
+    showToast(`AI error: ${e.message}`, 'error');
+  }
+
+  _docAIPanel.streaming = false;
+  if (sendBtn) sendBtn.disabled = false;
+}
+
+// ── Panel content-sync helpers ────────────────────────────────
+function _insertDocAIContent(text) {
+  const ta = document.getElementById('doc-content-textarea');
+  if (!ta) return;
+  const pos = _docLastCursorPos;
+  const before = ta.value.slice(0, pos);
+  const after  = ta.value.slice(pos);
+  const insert = (before.length && !before.endsWith('\n') ? '\n' : '') + text.trim() + '\n';
+  ta.value = before + insert + after;
+  const newPos = before.length + insert.length;
+  ta.selectionStart = ta.selectionEnd = newPos;
+  ta.focus();
+  scheduleDocSave();
+  showToast('Inserted at cursor', 'success');
+}
+
+async function _replaceDocWithAIContent(text) {
+  const confirmed = await appConfirm(
+    'Replace the entire document with this AI-generated content?',
+    { title: 'Replace document', confirmText: 'Replace', cancelText: 'Cancel', destructive: true }
+  );
+  if (!confirmed) return;
+  const ta = document.getElementById('doc-content-textarea');
+  if (!ta) return;
+  ta.value = text.trim();
+  ta.selectionStart = ta.selectionEnd = 0;
+  ta.focus();
+  scheduleDocSave();
+  showToast('Document replaced', 'success');
+}
+
+// ── Panel event binding (called from bindDocExportEvents) ─────
+function bindDocAIPanel() {
+  // Track cursor position for "Insert at cursor"
+  const ta = document.getElementById('doc-content-textarea');
+  if (ta) {
+    ta.addEventListener('blur',    () => { _docLastCursorPos = ta.selectionStart; });
+    ta.addEventListener('keyup',   () => { _docLastCursorPos = ta.selectionStart; });
+    ta.addEventListener('mouseup', () => { _docLastCursorPos = ta.selectionStart; });
+  }
+
+  // Close button
+  document.getElementById('doc-ai-panel-close')?.addEventListener('click', _closeDocAIPanel);
+
+  // Send button + Enter key
+  const input = document.getElementById('doc-ai-panel-input');
+  const sendBtn = document.getElementById('doc-ai-panel-send');
+
+  function _doSend() {
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    input.style.height = 'auto';
+    _sendDocAIPanelMessage(text);
+  }
+
+  sendBtn?.addEventListener('click', _doSend);
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _doSend(); }
+  });
+  // Auto-resize textarea
+  input?.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+
+  // Clear panel history when a different document is opened
+  const origOpenDoc = openDoc;
+  // We hook into state.currentDocId changes via the existing openDoc override approach
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -3522,6 +3880,7 @@ function bindOverhaulEvents() {
   bindNotesToolbar();
   bindDocExportEvents();
   bindDocToolbar();
+  bindDocAIPanel();
 
   // Override scan hardware — replace the button's event listener by cloning the button
   const hwBtn = document.getElementById('scan-hardware-btn');

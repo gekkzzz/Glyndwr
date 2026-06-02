@@ -53,11 +53,13 @@ class DocUpdate(BaseModel):
 
 
 class AIAssistRequest(BaseModel):
-    action: str  # improve | summarize | expand | translate | fix_grammar | explain
-    selection: str = ""  # selected text (empty = whole document)
-    context: str = ""    # surrounding context
+    action: str = "chat"  # improve | summarize | expand | translate | fix_grammar | explain | chat
+    selection: str = ""   # selected text (empty = whole document)
+    context: str = ""     # surrounding document context
     model: str = ""
-    instruction: str = ""  # custom instruction for 'custom' action
+    instruction: str = ""          # custom instruction for 'custom' action
+    messages: List[Dict[str, Any]] = []  # multi-turn history for panel/chat mode
+    system_override: str = ""      # caller-supplied system prompt override
 
 
 @router.get("/")
@@ -165,18 +167,42 @@ async def ai_assist(doc_id: str, req: AIAssistRequest):
                    f"Add your API key in Settings → Providers.",
         )
 
-    text = req.selection or req.context
-    action_prompts = {
-        "improve":     f"Improve the writing of this text. Keep the same meaning but make it clearer and more engaging:\n\n{text}",
-        "summarize":   f"Write a concise summary of this text:\n\n{text}",
-        "expand":      f"Expand this text with more detail and depth:\n\n{text}",
-        "translate":   f"Translate this text to English (or if already English, to Spanish):\n\n{text}",
-        "fix_grammar": f"Fix any grammar, spelling, punctuation and style errors in this text. Return only the corrected text:\n\n{text}",
-        "explain":     f"Explain the concepts in this text in clear, simple terms:\n\n{text}",
-        "custom":      f"{req.instruction}:\n\n{text}",
-    }
-    prompt = action_prompts.get(req.action, action_prompts["improve"])
-    messages = [{"role": "user", "content": prompt}]
+    # ── Panel / multi-turn mode ──────────────────────────────────
+    if req.messages:
+        messages = req.messages
+        system_prompt = req.system_override or (
+            "You are a collaborative AI writing assistant embedded in a document editor. "
+            "The user has provided a document for context. Help them understand, improve, "
+            "discuss, or generate content for it. When producing text intended for the "
+            "document, write clean, well-structured prose. Be concise but complete."
+        )
+        if req.context:
+            # Prepend document context as the first system message if not already there
+            ctx_note = f"\n\n--- DOCUMENT CONTEXT ---\n{req.context[:6000]}\n--- END CONTEXT ---"
+            system_prompt += ctx_note
+
+    # ── Single-shot inline mode ──────────────────────────────────
+    else:
+        text = req.selection or req.context
+        tone = req.instruction or "more professional"
+        lang = req.instruction or "English (or if already English, translate to Spanish)"
+        action_prompts = {
+            "improve":      f"Improve the writing of this text. Keep the same meaning but make it clearer and more engaging. Return only the improved text:\n\n{text}",
+            "fix_grammar":  f"Fix all grammar, spelling, punctuation and style errors in this text. Return only the corrected text, nothing else:\n\n{text}",
+            "expand":       f"Expand this text with more detail, examples and depth. Return only the expanded text:\n\n{text}",
+            "translate":    f"Translate this text to {lang}. Return only the translation, nothing else:\n\n{text}",
+            "change_tone":  f"Rewrite this text in a {tone} tone. Return only the rewritten text, nothing else:\n\n{text}",
+            "summarize":    f"Write a concise summary of this text:\n\n{text}",
+            "explain":      f"Explain the concepts in this text in clear, simple terms:\n\n{text}",
+            "custom":       f"{req.instruction}:\n\n{text}",
+        }
+        prompt = action_prompts.get(req.action, action_prompts["improve"])
+        messages = [{"role": "user", "content": prompt}]
+        system_prompt = (
+            req.system_override or
+            "You are a helpful writing assistant. Return only the requested output — "
+            "no preamble, no meta-commentary, no explanations."
+        )
 
     async def stream():
         try:
@@ -184,7 +210,7 @@ async def ai_assist(doc_id: str, req: AIAssistRequest):
                 provider=provider,
                 model=model,
                 messages=messages,
-                system_prompt="You are a helpful writing assistant. Return only the requested output — no preamble, no meta-commentary.",
+                system_prompt=system_prompt,
                 db_settings=db_settings,
             ):
                 yield chunk

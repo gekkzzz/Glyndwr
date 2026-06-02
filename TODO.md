@@ -1,32 +1,80 @@
-# UI/UX & Functional Feature: UI Overhaul, Component Fixes, and Feature Additions
+# 🗺️ Project Roadmap: UI Overhaul & Feature Additions
 
-## 1. Layout & UI Polish
-- [🚧] **Page Stretching:** Fix the layout of the **Deep Research, Agents, Memory, and Forge** sections. The headers do not currently span the full width of the page, and the overall content looks horizontally squished. Make these sections full-width/responsive.
-- [ ] **Settings Page Cleanup:** Fix alignment issues on the Settings page. For example, the hex color code input field is spilling out of the color picker box. Make the settings container wider so all elements fit comfortably without overlapping.
-- [ ] **Theme Visibility Audit:** Review all application themes. Fix text-contrast bugs in specific themes; for example, in the **Mabinogi theme**, code blocks use a dark background with dark text, making the code unreadable. Ensure code blocks have proper contrast in every theme.
-- [ ] **Loading Animation:** Replace the current loading spinning square with a **3D spinning cube** animation.
+### 🚦 Status Key
+* `⬜ - [ ] Todo`
+* `🚧 - [ ] In Progress`
+* `✅ - [x] Complete`
 
-## 2. Navigation & Sidebar Enhancements
-- [ ] **Collapsible Chat List & Sidebar:** Add the ability to independently hide and unhide:
-  1. The main application sidebar (containing Tools, Images, Docs, etc.).
-  2. The chat history/conversation list.
-  *This is to allow the user to enter a "focus mode" strictly for interacting with the AI.*
-- [ ] **Expandable Sidebar Labels:** Allow users to hover over or click to extend the main sidebar so they can view the text labels next to the icons (e.g., displaying "Notes", "Agents", "Chats" next to their respective emojis/icons).
+---
 
-## 3. Chat & Core AI Functions
-- [ ] **Chat Message Ordering Bug:** Fix the conversation flow rendering. Currently, AI responses are floating to the top instead of alternating correctly. Ensure the layout strictly follows a linear, chronological conversation history: `[User Input] -> [AI Response] -> [User Input] -> [AI Response]`.
-- [ ] **User Profile Pictures:** Add a feature allowing users to upload a custom profile picture. This avatar should replace the default person emoji globally in the chat interface.
-- [ ] **AI Model Avatars:** Change the AI avatar icon. Replace the current `⊕` symbol with a dynamic text-based tag or custom label representing the specific model being used (e.g., "GRK", "LLM", etc.).
-- [ ] **Model Compare Tool:** Ensure the comparison tool is fully functional, allowing users to run side-by-side prompt comparisons between two different models to evaluate performance.
+## 🎨 1. Layout & UI Polish
 
-## 4. Notes & Documents ("Library" Overhaul)
-- [ ] **Rename "Library" to "Documents":** Update the section name and its accompanying icon/emoji.
-- [ ] **Rich Text / Markdown Editor Features:**
-  - [ ] In the **Notes** section, implement auto-rendering for Markdown. When a user types `## Title`, `**bold**`, or `*italics*`, it should instantly transform into stylized rich text rather than staying as plain text with symbols.
-  - [ ] In the **Documents** section, ensure standard keyboard shortcuts function correctly (e.g., pressing `Ctrl + B` or `Cmd + B` should automatically apply bold formatting to selected text) across file types like `.md` and `.txt`.
-- [ ] **Document Export:** Add functionality to export documents to various formats, specifically **PDF** and **DOCX**.
-- [ ] **AI Dropdown Menu Fix:** Fix the AI dropdown menu component within the notes section, as it is currently failing to display all available features.
+| Status | Feature | Description |
+| :---: | :--- | :--- |
+| 🚧 | **Page Stretching** | Fix layout of **Deep Research, Agents, Memory, and Forge** sections. Headers must span full width; remove horizontal squishing for a responsive design. |
+| ⬜ | **Settings Page Cleanup** | Fix alignment issues (e.g., hex color input spilling out of picker). Widen the settings container to prevent element overlapping. |
+| ⬜ | **Theme Visibility Audit** | Audit all themes for text-contrast bugs. Fix the **Mabinogi theme** (dark text on dark backgrounds in code blocks) to ensure global readability. |
+| ⬜ | **Loading Animation** | Replace the legacy spinning square with a modern **3D spinning cube** animation. |
 
-## 5. Backend & Data Pipeline Fixes
-- [ ] **Memory/Skill Scraping:** Investigate and fix the memory and skill scraping pipeline. It is currently broken and failing to capture/save user skills and contextual memory. Ensure data is being parsed, mapped, and stored correctly.
-- [ ] **Server Lifecycle & Persistence:** Ensure the backend server running in the terminal/PowerShell remains fully persistent and does not crash or shut down unexpectedly under any idle conditions. The server process must stay alive continuously unless explicitly terminated by the user via a manual command (e.g., typing `Ctrl + C`).
+- [ ] 🚧 **Page Stretching**
+- [ ] ⬜ **Settings Page Cleanup**
+- [ ] ⬜ **Theme Visibility Audit**
+- [ ] ⬜ **Loading Animation**
+
+---
+
+## 🧭 2. Navigation & Sidebar Enhancements
+
+| Status | Feature | Description |
+| :---: | :--- | :--- |
+| ⬜ | **Collapsible Sidebar & Chat List** | Allow independent toggling of the main sidebar and conversation history to enable an distraction-free **"Focus Mode"**. |
+| ⬜ | **Expandable Sidebar Labels** | Reveal text labels (e.g., "Notes", "Agents") next to icons upon hover or click. |
+
+- [ ] ⬜ **Collapsible Sidebar & Chat List**
+- [ ] ⬜ **Expandable Sidebar Labels**
+
+---
+
+## 💬 3. Chat & Core AI Functions
+
+| Status | Feature | Description |
+| :---: | :--- | :--- |
+| ⬜ | **Chat Message Ordering Bug** | Fix chronological rendering. Prevent AI responses from floating to the top; enforce strict `[User] -> [AI] -> [User]` alternation. |
+| ⬜ | **User Profile Pictures** | Support custom avatar uploads to globally replace the default person emoji in chat threads. |
+| ⬜ | **AI Model Avatars** | Replace the generic `⊕` symbol with dynamic, text-based tags representing the active model (e.g., `GRK`, `LLM`). |
+| ⬜ | **Model Compare Tool** | Finalize side-by-side prompt benchmarking to allow live performance evaluations between two models. |
+
+- [ ] ⬜ **Chat Message Ordering Bug**
+- [ ] ⬜ **User Profile Pictures**
+- [ ] ⬜ **AI Model Avatars**
+- [ ] ⬜ **Model Compare Tool**
+
+---
+
+## 📝 4. Notes & Documents ("Library" Overhaul)
+
+| Status | Feature | Description |
+| :---: | :--- | :--- |
+| ⬜ | **Rename "Library" to "Documents"** | Update all references, section headers, and associated iconography/emojis. |
+| ⬜ | **Markdown Auto-Rendering** | Instantly render markdown syntax (`##`, `**`, `*`) into stylized rich text within the **Notes** section. |
+| ⬜ | **Editor Keyboard Shortcuts** | Implement native hotkeys (e.g., `Ctrl+B` / `Cmd+B` for bolding text) across `.md` and `.txt` file types in **Documents**. |
+| ⬜ | **Document Export Engine** | Add formatting pipeline to export documents directly to **PDF** and **DOCX**. |
+| ⬜ | **AI Dropdown Menu Fix** | Fix the UI component bug restricting available options in the Notes dropdown menu. |
+
+- [ ] ⬜ **Rename "Library" to "Documents"**
+- [ ] ⬜ **Markdown Auto-Rendering (Notes)**
+- [ ] ⬜ **Editor Keyboard Shortcuts (Documents)**
+- [ ] ⬜ **Document Export Engine**
+- [ ] ⬜ **AI Dropdown Menu Fix**
+
+---
+
+## ⚙️ 5. Backend & Data Pipeline Fixes
+
+| Status | Feature | Description |
+| :---: | :--- | :--- |
+| ⬜ | **Memory & Skill Scraping** | Fix pipeline failures. Restore accurate parsing, mapping, and database storage of user skills and contextual memory. |
+| ⬜ | **Server Lifecycle & Persistence** | Prevent idle timeouts/crashes in PowerShell/Terminal environments. Process must remain alive until killed explicitly via `Ctrl + C`. |
+
+- [ ] ⬜ **Memory & Skill Scraping**
+- [ ] ⬜ **Server Lifecycle & Persistence**
